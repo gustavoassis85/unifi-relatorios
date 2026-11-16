@@ -7,6 +7,7 @@ from django.db import IntegrityError, transaction
 
 from apoio_testes import SENHA, ativar_mfa
 from organizacoes import papeis
+from organizacoes.isolamento import contexto
 from organizacoes.models import Organizacao, Papel, Vinculo
 from organizacoes.servicos import criar_organizacao_com_admin, vincular
 
@@ -47,14 +48,14 @@ def test_nome_de_organizacao_unico_sem_diferenciar_maiusculas():
 def test_usuario_pertence_a_uma_so_organizacao():
     org_a, usuario = criar_organizacao_com_admin("MSP A", "a@a.com", "A", SENHA)
     org_b = Organizacao.objects.create(nome="MSP B")
-    with pytest.raises(IntegrityError), transaction.atomic():
+    with pytest.raises(IntegrityError), contexto(organizacao_id=org_b.pk):
         Vinculo.objects.create(usuario=usuario, organizacao=org_b, papel=Papel.LEITURA)
 
 
 def test_papel_invalido_e_recusado_pelo_banco():
     org = Organizacao.objects.create(nome="MSP A")
     usuario = get_user_model().objects.create_user("x@a.com", SENHA)
-    with pytest.raises(IntegrityError), transaction.atomic():
+    with pytest.raises(IntegrityError), contexto(organizacao_id=org.pk):
         Vinculo.objects.create(usuario=usuario, organizacao=org, papel="superpoder")
 
 
@@ -103,7 +104,8 @@ def test_dono_cria_organizacao_e_primeiro_admin_pelo_admin(client, dono_platafor
     )
     assert resposta.status_code == 302
     org = Organizacao.objects.get(nome="MSP Novo")
-    vinculo = Vinculo.objects.get(usuario__email="chefe@novo.com")
+    with contexto(organizacao_id=org.pk):
+        vinculo = Vinculo.objects.get(usuario__email="chefe@novo.com")
     assert vinculo.organizacao == org and vinculo.papel == Papel.ADMIN
 
 

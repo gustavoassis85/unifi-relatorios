@@ -4,6 +4,7 @@ from django.contrib.auth import get_user_model
 from django.urls import reverse
 
 from apoio_testes import SENHA, ativar_mfa, codigo_atual
+from organizacoes.isolamento import contexto
 from organizacoes.models import Papel
 from organizacoes.servicos import criar_organizacao_com_admin, criar_usuario_na_organizacao
 
@@ -28,7 +29,8 @@ def org_e_admin():
 @pytest.fixture
 def operador(org_e_admin):
     org, _ = org_e_admin
-    return criar_usuario_na_organizacao(org, "op@a.com", "Otto", SENHA, Papel.OPERADOR)
+    with contexto(organizacao_id=org.pk):
+        return criar_usuario_na_organizacao(org, "op@a.com", "Otto", SENHA, Papel.OPERADOR)
 
 
 @pytest.fixture

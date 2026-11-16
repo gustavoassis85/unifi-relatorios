@@ -35,3 +35,8 @@ class UsuarioAdmin(UserAdmin):
     add_fieldsets = (
         (None, {"classes": ("wide",), "fields": ("email", "nome", "password1", "password2")}),
     )
+
+    def has_delete_permission(self, request, obj=None):
+        # Para tirar o acesso, desative o usuário. A exclusão definitiva será um
+        # processo próprio (LGPD), que também apaga o vínculo (protegido pela RLS).
+        return False

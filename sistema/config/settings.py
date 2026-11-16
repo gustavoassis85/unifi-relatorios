@@ -42,6 +42,7 @@ INSTALLED_APPS = [
     "allauth.mfa",
     "contas",
     "organizacoes",
+    "clientes",
 ]
 
 MIDDLEWARE = [
@@ -54,6 +55,8 @@ MIDDLEWARE = [
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
     "allauth.account.middleware.AccountMiddleware",
+    # Define o usuário e a organização da requisição no banco (RLS).
+    "organizacoes.middleware.ContextoOrganizacaoMiddleware",
     # Quem precisa de MFA e ainda não configurou só acessa a tela de configurar.
     "contas.middleware.MfaObrigatorioMiddleware",
 ]
