@@ -1,5 +1,5 @@
-"""Motor de achados: transforma os dados coletados em achados com severidade, evidência e
-recomendação, organizados nos pilares DPS (Disponibilidade, Produtividade, Segurança).
+"""Motor de achados: transforma os dados coletados em pontos de atenção com severidade,
+evidência e recomendação, separados pela área afetada (internet, console, equipamentos, Wi-Fi).
 
 - Os limites de cada regra ficam em LIMITES, logo abaixo, para facilitar ajustes.
 - Cada regra exige um mínimo de amostras, para não tirar conclusão com pouco dado.
@@ -44,15 +44,14 @@ LIMITES = {
     "retransmissao_pct": 10.0,          # média do período por rádio
 }
 
-PENALIDADE = {"alta": 25, "media": 10, "baixa": 5, "info": 0}
 ORDEM_SEVERIDADE = {"alta": 0, "media": 1, "baixa": 2, "info": 3}
-PILARES = ("Disponibilidade", "Produtividade", "Segurança")
+AREAS = ("Internet", "Console", "Equipamentos", "Wi-Fi", "Conta")
 
 
 @dataclass
 class Achado:
     host_id: str        # console ao qual o achado pertence
-    pilar: str          # Disponibilidade, Produtividade ou Segurança
+    area: str           # Internet, Console, Equipamentos, Wi-Fi ou Conta
     severidade: str     # alta, media, baixa ou info
     titulo: str
     evidencia: str
@@ -161,7 +160,7 @@ def regra_wan_sem_dado(conexao, inicio, fim):
         if len(sequencias) > 5:
             partes.append(f"mais {_qtd(len(sequencias) - 5, 'intervalo', 'intervalos')}")
         achados.append(Achado(
-            host_id, "Disponibilidade", "alta" if grave else "media",
+            host_id, "Internet", "alta" if grave else "media",
             f"Link sem dados por {_qtd(len(faltando), 'hora', 'horas')}",
             f"{_qtd(len(faltando), 'hora', 'horas')} sem nenhuma métrica do link: {'; '.join(partes)}. "
             "Hora sem registro costuma indicar queda da internet ou do console.",
@@ -212,7 +211,7 @@ def regra_wan_perda(conexao, inicio, fim):
                 fora = "Fora desse período" if len(episodios) == 1 else "Fora desses períodos"
                 evidencia += f" {fora}, a perda média diária ficou em torno de {_num(median(normais))}%."
             achados.append(Achado(
-                host_id, "Produtividade", "alta" if grave else "media",
+                host_id, "Internet", "alta" if grave else "media",
                 f"Perda de pacote acima do normal no link {provedor}", evidencia,
                 f"Abrir chamado com a {provedor} informando as datas e horários. Verificar ONT/modem "
                 "e o cabo da WAN. Se persistir, avaliar um link de redundância.",
@@ -223,7 +222,7 @@ def regra_wan_perda(conexao, inicio, fim):
         if picos:
             maior = max(picos, key=lambda h: h["perda_pct"])
             achados.append(Achado(
-                host_id, "Produtividade", "baixa", f"Picos isolados de perda de pacote no link {provedor}",
+                host_id, "Internet", "baixa", f"Picos isolados de perda de pacote no link {provedor}",
                 f"{_qtd(len(picos), 'hora', 'horas')} com perda acima de {_num(LIMITES['perda_hora_pico'], 0)}%, a maior de "
                 f"{_num(maior['perda_pct'], 0)}% em {_hora(_dt(maior['horario']))}. A média diária ficou normal.",
                 "Acompanhar. Se os picos ficarem mais frequentes, acionar o provedor.",
@@ -240,7 +239,7 @@ def regra_wan_latencia(conexao, inicio, fim):
         media = mean(valores)
         provedor = next((h["provedor"] for h in horas if h["provedor"]), "operadora")
         achados.append(Achado(
-            host_id, "Produtividade", "alta" if media >= LIMITES["latencia_media_alta"] else "media",
+            host_id, "Internet", "alta" if media >= LIMITES["latencia_media_alta"] else "media",
             f"Latência alta no link {provedor}",
             f"Latência média de {_num(media)} ms no período (máxima registrada de "
             f"{_num(max(h['latencia_max'] or 0 for h in horas), 0)} ms).",
@@ -264,14 +263,14 @@ def regra_console_offline(conexao, inicio, fim):
         if c["tipo"] == "network-server":
             if dias is None or dias >= LIMITES["registro_antigo_dias"]:
                 achados.append(Achado(
-                    c["host_id"], "Segurança", "info", "Registro antigo de controlador na conta",
+                    c["host_id"], "Conta", "info", "Registro antigo de controlador na conta",
                     f"Controlador Network {c['versao_network'] or ''} desconectado {quando}.".replace("  ", " "),
                     "Se o controlador não existe mais, remover o registro da conta UniFi para manter o "
                     "inventário limpo.",
                 ))
         elif dias is None or dias >= LIMITES["console_offline_dias"]:
             achados.append(Achado(
-                c["host_id"], "Disponibilidade", "alta", "Console sem conexão com a nuvem",
+                c["host_id"], "Console", "alta", "Console sem conexão com a nuvem",
                 f"{c['nome']} ({c['modelo'] or 'console'}) está desconectado {quando}. "
                 "Sem conexão, não há monitoramento, alertas nem backup em nuvem.",
                 "Verificar se o equipamento está ligado e com internet. Se foi desativado, "
@@ -294,7 +293,7 @@ def regra_console_disponibilidade(conexao, inicio, fim):
         if pct >= LIMITES["disponibilidade_pct"]:
             continue
         achados.append(Achado(
-            host_id, "Disponibilidade", "alta" if pct < LIMITES["disponibilidade_pct_alta"] else "media",
+            host_id, "Console", "alta" if pct < LIMITES["disponibilidade_pct_alta"] else "media",
             "Console com quedas de conexão no período",
             f"Conectado em {_num(pct)}% das {len(estados)} verificações de hora em hora.",
             "Investigar a estabilidade da internet e da energia no local do console.",
@@ -309,7 +308,7 @@ def regra_backup(conexao, inicio, fim):
             continue
         if not c["ultimo_backup"]:
             achados.append(Achado(
-                c["host_id"], "Segurança", "alta", "Console sem backup em nuvem",
+                c["host_id"], "Console", "alta", "Console sem backup em nuvem",
                 f"Não há registro de backup em nuvem para {c['nome']}.",
                 "Ativar o backup automático em nuvem no console e confirmar que ele está sendo gerado.",
             ))
@@ -319,7 +318,7 @@ def regra_backup(conexao, inicio, fim):
         if dias < LIMITES["backup_dias"]:
             continue
         achados.append(Achado(
-            c["host_id"], "Segurança", "alta" if dias >= LIMITES["backup_dias_alta"] else "media",
+            c["host_id"], "Console", "alta" if dias >= LIMITES["backup_dias_alta"] else "media",
             "Backup em nuvem desatualizado",
             f"Último backup em nuvem de {c['nome']} em {backup.strftime('%d/%m/%Y')} ({dias} dias).",
             "Verificar se o backup automático está ativo e se está concluindo sem erro.",
@@ -338,8 +337,8 @@ def regra_atualizacao_console(conexao, inicio, fim):
         ).fetchone()[0]
         nova = c["atualizacao_disponivel"].split("+")[0]
         achados.append(Achado(
-            c["host_id"], "Segurança", "media", "Atualização do sistema do console pendente",
-            f"{c['nome']} está no UniFi OS {c['versao_os']}; a versão {nova} está disponível "
+            c["host_id"], "Console", "media", "Atualização do sistema do console pendente",
+            f"{c['nome']} está na versão {c['firmware'] or c['versao_os']}; a versão {nova} está disponível "
             f"(detectada em {_dt(primeira).strftime('%d/%m/%Y')}).",
             "Planejar a atualização numa janela de manutenção, depois de ler as notas da versão.",
         ))
@@ -363,7 +362,7 @@ def regra_equipamentos(conexao, inicio, fim):
             pct = 100 * sum(1 for a in lista if a["estado"] == "ONLINE") / len(lista)
             if pct < LIMITES["disponibilidade_pct"]:
                 achados.append(Achado(
-                    host_id, "Disponibilidade",
+                    host_id, "Equipamentos",
                     "alta" if pct < LIMITES["disponibilidade_pct_alta"] else "media",
                     f"{nome} ficou offline no período",
                     f"Online em {_num(pct)}% das {len(lista)} verificações.",
@@ -377,7 +376,7 @@ def regra_equipamentos(conexao, inicio, fim):
                 reinicios.append(_dt(atual["coletado_em"]) - timedelta(seconds=atual["uptime_seg"]))
         if reinicios:
             achados.append(Achado(
-                host_id, "Disponibilidade", "baixa", f"{nome} reiniciou {_qtd(len(reinicios), 'vez', 'vezes')}",
+                host_id, "Equipamentos", "baixa", f"{nome} reiniciou {_qtd(len(reinicios), 'vez', 'vezes')}",
                 ("Reinício" if len(reinicios) == 1 else "Reinícios") + " por volta de "
                 + ", ".join(_hora(r) for r in reinicios) + ".",
                 "Se não houve atualização ou manutenção nesses horários, investigar energia e logs.",
@@ -389,20 +388,20 @@ def regra_equipamentos(conexao, inicio, fim):
             cpu = mean(a["cpu_pct"] for a in com_carga)
             if memoria >= LIMITES["memoria_pct"]:
                 achados.append(Achado(
-                    host_id, "Produtividade", "media", f"Memória alta em {nome}",
+                    host_id, "Equipamentos", "media", f"Memória alta em {nome}",
                     f"Uso médio de memória de {_num(memoria)}% em {len(com_carga)} amostras.",
                     "Avaliar aplicações ativas no console e a necessidade de um modelo maior.",
                 ))
             if cpu >= LIMITES["cpu_pct"]:
                 achados.append(Achado(
-                    host_id, "Produtividade", "media", f"CPU alta em {nome}",
+                    host_id, "Equipamentos", "media", f"CPU alta em {nome}",
                     f"Uso médio de CPU de {_num(cpu)}% em {len(com_carga)} amostras.",
                     "Avaliar recursos que mais consomem (IDS/IPS, DPI) e a capacidade do equipamento.",
                 ))
 
         if ultima["firmware_atualizavel"]:
             achados.append(Achado(
-                host_id, "Segurança", "media", f"Firmware desatualizado em {nome}",
+                host_id, "Equipamentos", "media", f"Firmware desatualizado em {nome}",
                 f"{nome} está no firmware {ultima['firmware']} e há atualização disponível.",
                 "Atualizar numa janela de manutenção.",
             ))
@@ -427,7 +426,7 @@ def regra_portas(conexao, inicio, fim):
             continue
         e = equipamentos[device_id]
         achados.append(Achado(
-            e["host_id"], "Produtividade", "media",
+            e["host_id"], "Equipamentos", "media",
             f"Porta {idx} de {e['nome']} abaixo da capacidade",
             f"Negociando a {abaixo[-1]['velocidade_mbps']} Mbps (capacidade de "
             f"{abaixo[-1]['velocidade_max_mbps']} Mbps) em {len(abaixo)} de {len(lista)} verificações.",
@@ -452,7 +451,7 @@ def regra_radios(conexao, inicio, fim):
         if mean(valores) >= LIMITES["retransmissao_pct"]:
             e = equipamentos[device_id]
             achados.append(Achado(
-                e["host_id"], "Produtividade", "media", f"Wi-Fi {freq:g} GHz com muita retransmissão em {e['nome']}",
+                e["host_id"], "Wi-Fi", "media", f"Wi-Fi {freq:g} GHz com muita retransmissão em {e['nome']}",
                 f"Retransmissão média de {_num(mean(valores))}% em {len(valores)} amostras.",
                 "Revisar canal e potência, interferência de redes vizinhas e posicionamento do AP.",
             ))
@@ -465,14 +464,14 @@ def regra_radios(conexao, inicio, fim):
             freq = f"{r['frequencia_ghz']:g} GHz"
             if not r["canal"]:
                 achados.append(Achado(
-                    e["host_id"], "Produtividade", "info", f"Rádio {freq} de {e['nome']} sem canal ativo",
+                    e["host_id"], "Wi-Fi", "info", f"Rádio {freq} de {e['nome']} sem canal ativo",
                     f"O rádio {freq} não informa canal; provavelmente está desligado.",
                     "Se for intencional, desconsiderar. Muitos dispositivos IoT (câmeras, impressoras, "
                     "automação) só funcionam em 2.4 GHz.",
                 ))
             elif r["frequencia_ghz"] and r["frequencia_ghz"] < 3 and (r["largura_mhz"] or 0) > 20:
                 achados.append(Achado(
-                    e["host_id"], "Produtividade", "media", f"Canal largo demais no 2.4 GHz de {e['nome']}",
+                    e["host_id"], "Wi-Fi", "media", f"Canal largo demais no 2.4 GHz de {e['nome']}",
                     f"Rádio 2.4 GHz configurado com {r['largura_mhz']} MHz.",
                     "Usar 20 MHz no 2.4 GHz reduz interferência com redes vizinhas.",
                 ))
@@ -496,13 +495,6 @@ def avaliar(conexao, inicio, fim):
             achados.extend(regra(conexao, inicio, fim))
         except Exception as erro:  # uma regra com problema não derruba as outras
             erros.append(f"{regra.__name__}: {erro.__class__.__name__}: {erro}")
-    achados.sort(key=lambda a: (ORDEM_SEVERIDADE[a.severidade], PILARES.index(a.pilar)))
+    achados.sort(key=lambda a: (ORDEM_SEVERIDADE[a.severidade], AREAS.index(a.area)))
     return achados, erros
 
-
-def notas(achados):
-    """Nota de 0 a 100 por pilar: começa em 100 e desconta por achado, conforme a severidade."""
-    resultado = {pilar: 100 for pilar in PILARES}
-    for a in achados:
-        resultado[a.pilar] = max(0, resultado[a.pilar] - PENALIDADE[a.severidade])
-    return resultado

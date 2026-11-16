@@ -16,10 +16,10 @@ MAX_PAGINAS = 100  # trava de segurança contra laço infinito na paginação
 
 GRAVAR = """
 INSERT OR REPLACE INTO console_estado (
-    host_id, coletado_em, nome, modelo, tipo, conectado, estado, versao_os,
+    host_id, coletado_em, nome, modelo, tipo, conectado, estado, versao_os, firmware,
     versao_network, atualizacao_disponivel, ultimo_backup, mudou_estado_em, wans_conectadas
 ) VALUES (
-    :host_id, :coletado_em, :nome, :modelo, :tipo, :conectado, :estado, :versao_os,
+    :host_id, :coletado_em, :nome, :modelo, :tipo, :conectado, :estado, :versao_os, :firmware,
     :versao_network, :atualizacao_disponivel, :ultimo_backup, :mudou_estado_em, :wans_conectadas
 )
 """
@@ -66,6 +66,7 @@ def _linha(host, coletado_em):
         "conectado": 1 if estado.get("state") == "connected" else 0,
         "estado": estado.get("state"),
         "versao_os": versao_os,
+        "firmware": hardware.get("firmwareVersion"),
         "versao_network": versao_network,
         "atualizacao_disponivel": (estado.get("firmwareUpdate") or {}).get("latestAvailableVersion"),
         "ultimo_backup": host.get("latestBackupTime") or None,

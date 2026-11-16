@@ -1,7 +1,7 @@
 # Dashboard UniFi — contexto do projeto
 
 ## O que é
-SaaS de relatórios para MSPs que usam UniFi. Primeiro produto: relatório mensal de saúde da rede por cliente do MSP, em PDF com a marca do MSP, estruturado na tríade DPS (Disponibilidade, Produtividade, Segurança).
+SaaS de relatórios para MSPs que usam UniFi. Primeiro produto: relatório mensal de saúde da rede por cliente do MSP, em PDF com a marca do MSP. Os pontos de atenção são separados pela área afetada (Internet, Console, Equipamentos, Wi-Fi, Conta), sem notas nem metodologia própria (decisão de 15/11/2026: a análise DPS saiu do produto).
 
 ## Como trabalhar com o Gustavo
 - Ele não é desenvolvedor. Guiar passo a passo, um passo por vez, com comandos prontos para PowerShell (Windows).
@@ -40,6 +40,7 @@ Connector (API Network de cada console, via nuvem):
 - Paginação: offset, limit (padrão 25), count, totalCount.
 - Limites: 100 req/min por console (erro 429 com Retry-After), timeout de 25 s, resposta até 10 MB.
 - IDs: o siteId da Site Manager (hex) é diferente do siteId da Network (UUID). Ligação pelo hostId.
+- Dados por cliente (sistema operacional, fabricante, sinal, SSID, consumo de download/upload): não existem na API oficial, nem na v11.0.97. Só existem nas APIs internas do Network (/network/api/s/default/stat/sta e /network/v2/api/site/default/clients/active). Em teste se a chave da nuvem acessa essas rotas pelo connector.
 
 ## Regras obrigatórias do código
 - Só requisições GET, com lista fixa de caminhos permitidos. Pelo connector, só /network/integration/v1/.
@@ -59,9 +60,10 @@ Connector (API Network de cada console, via nuvem):
 4. Coletor de equipamentos (connector) com controle de ritmo.  (feito)
    4b. Agendamento: coletar.py de hora em hora pelo Agendador de Tarefas do Windows (log em dados/coleta.log).  (feito)
 5. Motor de achados (regras com severidade, evidência e recomendação).  (feito)
-   achados/regras.py: limites ajustáveis em LIMITES; notas DPS de 0 a 100 por pilar (alta -25, média -10, baixa -5, info 0).
+   achados/regras.py: limites ajustáveis em LIMITES; cada achado tem área, severidade (alta, média, baixa, informativo), evidência e recomendação.
 6. Relatório PDF do lab.  ← em andamento
    gerar_relatorio.py gera HTML por console em dados/relatorios/ (marca do MSP em relatorio/marca.json); PDF por Ctrl+P no navegador. PDF automático (Playwright) fica para depois.
+   Visual: linguagem do Site Manager da UniFi, para quem já usa a plataforma (tema escuro padrão, claro opcional em marca.json "tema"). Tokens de cor no CSS de relatorio/gerar.py. Regras de UI: 60-30-10 (azul UniFi só em ação/link), bordas finas antes de sombra, no máximo 3 pesos de fonte (400/500/600), nada abaixo de 12px, espaçamento em múltiplos de 4/8px, sem gradientes, pílulas ou decoração. Peça principal: faixa de saúde do link por dia (estável/instável/crítico/poucos dados). Versão exibida = firmware que o Site Manager mostra (console_estado.firmware).
    Pendências conhecidas: juntar achados relacionados num incidente (ex.: horas sem dado + perda alta no mesmo dia); registros antigos (network-server) vão para uma seção de higiene da conta, não para relatório de cliente.
 7. Piloto com um MSP.
 
@@ -76,7 +78,7 @@ unifi-relatorios/
   resumo_wan.py     (resumo diário do link, com horas sem dado)
   resumo_consoles.py (situação atual de cada console)
   resumo_equipamentos.py (saúde, portas, Wi-Fi e clientes de cada site)
-  ver_achados.py    (achados do período por console, com notas DPS; --dias N)
+  ver_achados.py    (pontos de atenção do período por console; --dias N)
   gerar_relatorio.py (relatório HTML por console; --dias N, --mes AAAA-MM, --console nome)
   teste_conexao.py  (teste rápido da chave)
   coletor/          (cliente HTTP da api.ui.com e um módulo por coleta)

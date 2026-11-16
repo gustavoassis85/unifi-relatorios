@@ -1,9 +1,13 @@
-"""Gráficos simples em SVG, gerados em Python (sem bibliotecas), para o relatório."""
+"""Gráficos em SVG, gerados em Python (sem bibliotecas), para o relatório.
+
+As cores vêm das classes CSS do relatório (g-*, s-*), então os gráficos seguem o tema
+(escuro ou claro) automaticamente.
+"""
 import math
 from html import escape
 
-LARGURA, ALTURA = 680, 210
-MARGEM_ESQ, MARGEM_DIR, MARGEM_TOPO, MARGEM_BASE = 46, 12, 14, 34
+LARGURA, ALTURA = 680, 200
+MARGEM_ESQ, MARGEM_DIR, MARGEM_TOPO, MARGEM_BASE = 44, 8, 12, 32
 
 
 def _num(valor, casas=1):
@@ -14,51 +18,67 @@ def _num(valor, casas=1):
 
 
 def _teto(valor):
-    """Arredonda para cima até um número "redondo" (1, 2, 2,5, 5 x 10^n) para o eixo Y."""
+    """Arredonda para cima até um número "redondo" para o eixo Y."""
     if valor <= 0:
         return 1
     base = 10 ** math.floor(math.log10(valor))
     for fator in (1, 2, 2.5, 3, 4, 5, 6, 8, 10):
-        if valor <= fator * base:
+        if valor <= fator * base + 1e-9:
             return fator * base
     return 10 * base
 
 
+def _svg(conteudo, altura=ALTURA, rotulo=""):
+    return (f'<svg viewBox="0 0 {LARGURA} {altura}" width="100%" role="img" '
+            f'aria-label="{escape(rotulo)}">{conteudo}</svg>')
+
+
 def _eixos(maximo, sufixo):
-    """Linhas de grade horizontais e rótulos do eixo Y."""
     altura_util = ALTURA - MARGEM_TOPO - MARGEM_BASE
     partes = []
     for fracao in (0, 0.5, 1):
         y = MARGEM_TOPO + altura_util * (1 - fracao)
         partes.append(
-            f'<line x1="{MARGEM_ESQ}" y1="{y:.1f}" x2="{LARGURA - MARGEM_DIR}" y2="{y:.1f}" '
-            f'stroke="#e3e3e3" stroke-width="1"/>'
-            f'<text x="{MARGEM_ESQ - 6}" y="{y + 4:.1f}" text-anchor="end" font-size="10" '
-            f'fill="#666">{_num(maximo * fracao, 0 if maximo >= 10 else 2)}{sufixo}</text>'
+            f'<line class="g-grade" x1="{MARGEM_ESQ}" y1="{y:.1f}" x2="{LARGURA - MARGEM_DIR}" y2="{y:.1f}"/>'
+            f'<text class="g-rotulo" x="{MARGEM_ESQ - 8}" y="{y + 4:.1f}" text-anchor="end">'
+            f'{_num(maximo * fracao, 0 if maximo >= 10 else 2)}{sufixo}</text>'
         )
     return "".join(partes)
 
 
-def _rotulos_x(rotulos, posicoes):
-    """Mostra no máximo ~8 rótulos no eixo X para não embolar."""
+def _rotulos_x(rotulos, posicoes, y):
     passo = max(1, round(len(rotulos) / 8))
     return "".join(
-        f'<text x="{x:.1f}" y="{ALTURA - MARGEM_BASE + 20}" text-anchor="middle" font-size="10" '
-        f'fill="#666">{escape(r)}</text>'
+        f'<text class="g-rotulo" x="{x:.1f}" y="{y}" text-anchor="middle">{escape(r)}</text>'
         for i, (r, x) in enumerate(zip(rotulos, posicoes)) if i % passo == 0 or i == len(rotulos) - 1
     )
 
 
-def barras(rotulos, valores, cor, limite=None, sufixo="%", marcados=(), parciais=()):
-    """Gráfico de barras. Barras acima do limite ficam vermelhas; dias em 'parciais' (com poucos
-    dados) ficam cinza claro; dias em 'marcados' ganham um triângulo cinza na base."""
+def faixa_dias(rotulos, estados, rotulo=""):
+    """Faixa de saúde por dia, no estilo das barras de uptime do UniFi (em HTML, para manter
+    o mesmo tamanho na tela e no PDF). estados: 'ok', 'atencao', 'critico', 'parcial' ou 'vazio'."""
+    if not estados:
+        return ""
+    passo = max(1, round(len(rotulos) / 8))
+    barras_html = "".join(f'<span class="s-{e}" title="{escape(r)}"></span>' for r, e in zip(rotulos, estados))
+    rotulos_html = "".join(
+        f'<span>{escape(r) if i % passo == 0 or i == len(rotulos) - 1 else ""}</span>'
+        for i, r in enumerate(rotulos)
+    )
+    return (f'<div class="faixa" role="img" aria-label="{escape(rotulo)}">'
+            f'<div class="faixa-barras">{barras_html}</div><div class="faixa-rotulos">{rotulos_html}</div></div>')
+
+
+def barras(rotulos, valores, limite=None, sufixo="%", marcados=(), parciais=(), rotulo=""):
+    """Barras por dia. Acima do limite: destaque de alerta. Dias em 'parciais' (poucos dados):
+    cor neutra. Dias em 'marcados' ganham um triângulo na base (horas sem dado)."""
     if not valores:
         return ""
     maximo = _teto(max([v for v in valores if v is not None] + [limite or 0, 0.1]) * 1.1)
     altura_util = ALTURA - MARGEM_TOPO - MARGEM_BASE
-    largura_util = LARGURA - MARGEM_ESQ - MARGEM_DIR
-    passo = largura_util / len(valores)
-    largura_barra = max(2, passo * 0.7)
+    passo = (LARGURA - MARGEM_ESQ - MARGEM_DIR) / len(valores)
+    largura = max(2, passo * 0.62)
+    base = MARGEM_TOPO + altura_util
 
     partes, centros = [_eixos(maximo, sufixo)], []
     for i, valor in enumerate(valores):
@@ -66,44 +86,34 @@ def barras(rotulos, valores, cor, limite=None, sufixo="%", marcados=(), parciais
         centros.append(centro)
         if valor is not None:
             h = altura_util * valor / maximo
-            y = MARGEM_TOPO + altura_util - h
             if rotulos[i] in parciais:
-                preenchimento = "#c5cbd3"
+                classe = "g-barra-parcial"
             elif limite is not None and valor >= limite:
-                preenchimento = "#c62828"
+                classe = "g-barra-alerta"
             else:
-                preenchimento = cor
-            partes.append(
-                f'<rect x="{centro - largura_barra / 2:.1f}" y="{y:.1f}" width="{largura_barra:.1f}" '
-                f'height="{h:.1f}" fill="{preenchimento}" rx="1"/>'
-            )
+                classe = "g-barra"
+            partes.append(f'<rect class="{classe}" x="{centro - largura / 2:.1f}" y="{base - h:.1f}" '
+                          f'width="{largura:.1f}" height="{h:.1f}" rx="1.5"/>')
         if rotulos[i] in marcados:
-            base = MARGEM_TOPO + altura_util
-            partes.append(
-                f'<polygon points="{centro - 4:.1f},{base + 7:.1f} {centro + 4:.1f},{base + 7:.1f} '
-                f'{centro:.1f},{base + 1:.1f}" fill="#888"/>'
-            )
+            partes.append(f'<polygon class="g-marca" points="{centro - 4:.1f},{base + 8:.1f} '
+                          f'{centro + 4:.1f},{base + 8:.1f} {centro:.1f},{base + 2:.1f}"/>')
     if limite is not None:
         y = MARGEM_TOPO + altura_util * (1 - limite / maximo)
-        partes.append(
-            f'<line x1="{MARGEM_ESQ}" y1="{y:.1f}" x2="{LARGURA - MARGEM_DIR}" y2="{y:.1f}" '
-            f'stroke="#c62828" stroke-width="1" stroke-dasharray="4 3"/>'
-        )
-    partes.append(_rotulos_x(rotulos, centros))
-    return f'<svg viewBox="0 0 {LARGURA} {ALTURA}" width="100%" role="img">{"".join(partes)}</svg>'
+        partes.append(f'<line class="g-limite" x1="{MARGEM_ESQ}" y1="{y:.1f}" '
+                      f'x2="{LARGURA - MARGEM_DIR}" y2="{y:.1f}"/>')
+    partes.append(_rotulos_x(rotulos, centros, ALTURA - 8))
+    return _svg("".join(partes), rotulo=rotulo)
 
 
-def linha(rotulos, valores, cor, sufixo=" ms"):
-    """Gráfico de linha simples (pontos sem valor interrompem a linha)."""
+def linha(rotulos, valores, sufixo=" ms", rotulo=""):
+    """Linha simples; dias sem valor interrompem a linha."""
     if not valores or all(v is None for v in valores):
         return ""
     maximo = _teto(max(v for v in valores if v is not None) * 1.15)
     altura_util = ALTURA - MARGEM_TOPO - MARGEM_BASE
-    largura_util = LARGURA - MARGEM_ESQ - MARGEM_DIR
-    passo = largura_util / len(valores)
+    passo = (LARGURA - MARGEM_ESQ - MARGEM_DIR) / len(valores)
 
-    partes, centros, trecho = [_eixos(maximo, sufixo)], [], []
-    trechos = []
+    partes, centros, trechos, trecho = [_eixos(maximo, sufixo)], [], [], []
     for i, valor in enumerate(valores):
         x = MARGEM_ESQ + passo * (i + 0.5)
         centros.append(x)
@@ -117,7 +127,7 @@ def linha(rotulos, valores, cor, sufixo=" ms"):
         trechos.append(trecho)
     for t in trechos:
         pontos = " ".join(f"{x:.1f},{y:.1f}" for x, y in t)
-        partes.append(f'<polyline points="{pontos}" fill="none" stroke="{cor}" stroke-width="2"/>')
-        partes.extend(f'<circle cx="{x:.1f}" cy="{y:.1f}" r="2.2" fill="{cor}"/>' for x, y in t)
-    partes.append(_rotulos_x(rotulos, centros))
-    return f'<svg viewBox="0 0 {LARGURA} {ALTURA}" width="100%" role="img">{"".join(partes)}</svg>'
+        partes.append(f'<polyline class="g-linha" points="{pontos}"/>')
+        partes.extend(f'<circle class="g-ponto" cx="{x:.1f}" cy="{y:.1f}" r="2.5"/>' for x, y in t)
+    partes.append(_rotulos_x(rotulos, centros, ALTURA - 8))
+    return _svg("".join(partes), rotulo=rotulo)

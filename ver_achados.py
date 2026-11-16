@@ -1,4 +1,4 @@
-"""Mostra os achados do período, por console, com as notas DPS.
+"""Mostra os pontos de atenção do período, por console.
 
 Uso (na pasta do projeto, com o ambiente virtual ativo):
     python ver_achados.py            (últimos 30 dias)
@@ -9,7 +9,7 @@ import textwrap
 from collections import defaultdict
 from datetime import datetime, timedelta, timezone
 
-from achados.regras import FUSO, PILARES, avaliar, notas
+from achados.regras import FUSO, avaliar
 from banco.banco import conectar
 
 ROTULO = {"alta": "ALTA", "media": "MÉDIA", "baixa": "BAIXA", "info": "INFO"}
@@ -43,12 +43,14 @@ def main():
         por_console[a.host_id].append(a)
 
     for host_id, lista in sorted(por_console.items(), key=lambda item: nomes.get(item[0]) or ""):
-        nota = notas(lista)
         print("\n" + "=" * 100)
         print(nomes.get(host_id) or host_id)
-        print("Notas DPS: " + " | ".join(f"{pilar} {nota[pilar]}" for pilar in PILARES))
+        nomes_sev = {"alta": "alta", "media": "média", "baixa": "baixa", "info": "informativo"}
+        contagem = [f"{sum(1 for a in lista if a.severidade == s)} {nomes_sev[s]}"
+                    for s in ROTULO if any(a.severidade == s for a in lista)]
+        print("Pontos de atenção: " + ", ".join(contagem))
         for a in lista:
-            print(f"\n  [{ROTULO[a.severidade]}] {a.pilar}: {a.titulo}")
+            print(f"\n  [{ROTULO[a.severidade]}] {a.area}: {a.titulo}")
             print(_paragrafo("Evidência: " + a.evidencia))
             print(_paragrafo("Recomendação: " + a.recomendacao))
 

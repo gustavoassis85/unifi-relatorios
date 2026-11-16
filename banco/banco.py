@@ -34,7 +34,8 @@ CREATE TABLE IF NOT EXISTS console_estado (
     tipo                   TEXT,            -- console ou network-server
     conectado              INTEGER,         -- 1 = conectado à nuvem, 0 = não
     estado                 TEXT,            -- valor original da API
-    versao_os              TEXT,            -- UniFi OS (só consoles)
+    versao_os              TEXT,            -- versão interna do UniFi OS (só consoles)
+    firmware               TEXT,            -- versão que o Site Manager mostra (ex.: 5.1.19)
     versao_network         TEXT,            -- aplicação Network
     atualizacao_disponivel TEXT,            -- versão nova do UniFi OS, se houver
     ultimo_backup          TEXT,            -- último backup em nuvem, em UTC
@@ -132,10 +133,26 @@ CREATE TABLE IF NOT EXISTS clientes_amostra (
 """
 
 
+# Colunas acrescentadas depois que o banco já existia: (tabela, coluna, tipo).
+COLUNAS_NOVAS = [
+    ("console_estado", "firmware", "TEXT"),
+]
+
+
+def _migrar(conexao):
+    """Acrescenta colunas novas em bancos criados por versões anteriores do projeto."""
+    for tabela, coluna, tipo in COLUNAS_NOVAS:
+        existentes = {linha[1] for linha in conexao.execute(f"PRAGMA table_info({tabela})")}
+        if coluna not in existentes:
+            conexao.execute(f"ALTER TABLE {tabela} ADD COLUMN {coluna} {tipo}")
+    conexao.commit()
+
+
 def conectar():
     """Abre o banco, criando o arquivo e as tabelas se ainda não existirem."""
     ARQUIVO_BANCO.parent.mkdir(exist_ok=True)
     conexao = sqlite3.connect(ARQUIVO_BANCO)
     conexao.row_factory = sqlite3.Row
     conexao.executescript(TABELAS)
+    _migrar(conexao)
     return conexao
