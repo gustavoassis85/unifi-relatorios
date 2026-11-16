@@ -2,11 +2,12 @@
 
 Uso (na pasta do projeto, com o ambiente virtual ativo):  python coletar.py
 """
-from coletor import wan
+from coletor import consoles, wan
 from coletor.api import ErroApi
 
 # Cada passo novo do projeto acrescenta sua coleta aqui.
 COLETAS = [
+    ("Consoles (situação, versões, backup)", consoles.coletar),
     ("WAN (métricas do link)", wan.coletar),
 ]
 

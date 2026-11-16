@@ -25,6 +25,9 @@ Site Manager:
 - GET /v1/isp-metrics/1h?duration=7d (ou 30d). Também existe 5m (duration=24h).
   Resposta: data[].hostId, data[].siteId, data[].periods[].metricTime, data[].periods[].data.wan.{avgLatency, maxLatency, packetLoss, uptime, downtime, download_kbps, upload_kbps, ispName, ispAsn}.
   Retenção: 1h por pelo menos 30 dias; 5m por pelo menos 24h. download_kbps/upload_kbps = velocidade do plano, não tráfego.
+  Atenção: podem faltar horas (no lab, 26–27/10 teve 17 horas sem dado) e o campo uptime fica em 100 nas horas que chegam.
+  Hora ausente deve ser tratada como possível indisponibilidade, nunca ignorada.
+- /v1/hosts pagina com pageSize e nextToken (o coletor segue as páginas).
 
 Connector (API Network de cada console, via nuvem):
 - GET /v1/connector/consoles/{hostId}/network/integration/v1/<caminho>
@@ -42,25 +45,31 @@ Connector (API Network de cada console, via nuvem):
 - Só requisições GET, com lista fixa de caminhos permitidos.
 - Chave da API no arquivo .env. Nunca no código, nunca no Git. .env listado no .gitignore.
 - Nunca imprimir a chave em log ou mensagem de erro.
+- A chave nunca é colada no chat. Para conferir o .env sem expor a chave:
+  python -c "from dotenv import dotenv_values; print({n: len(v or '') for n, v in dotenv_values('.env').items()})"
 - Não guardar e-mail, coordenadas ou dados de usuários vindos de /v1/hosts (LGPD).
 - Respeitar Retry-After; falha em uma coleta não derruba as outras; console offline é registrado como indisponível.
 
 ## Ordem de construção (fase 1)
-1. Ambiente: pasta, ambiente virtual Python, Git, .env, .gitignore.  ← próximo passo
-2. Coletor de WAN (isp-metrics) gravando no banco.
-3. Coletor de consoles (hosts).
+1. Ambiente: pasta, ambiente virtual Python, Git, .env, .gitignore.  (feito)
+2. Coletor de WAN (isp-metrics) gravando no banco.  (feito)
+3. Coletor de consoles (hosts).  ← em andamento
 4. Coletor de equipamentos (connector) com controle de ritmo.
 5. Motor de achados (regras com severidade, evidência e recomendação).
 6. Relatório PDF do lab.
 7. Piloto com um MSP.
 
-## Estrutura de pastas proposta
+## Estrutura de pastas
 ```
 unifi-relatorios/
   CLAUDE.md
   .env              (não vai para o Git)
   .gitignore
   requirements.txt
+  coletar.py        (roda todas as coletas; uma falha não derruba as outras)
+  resumo_wan.py     (resumo diário do link, com horas sem dado)
+  resumo_consoles.py (situação atual de cada console)
+  teste_conexao.py  (teste rápido da chave)
   coletor/          (cliente HTTP da api.ui.com e um módulo por coleta)
   banco/            (modelo e acesso ao banco)
   achados/          (regras)

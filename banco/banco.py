@@ -25,6 +25,23 @@ CREATE TABLE IF NOT EXISTS wan_hora (
     coletado_em    TEXT NOT NULL,   -- quando o coletor gravou, em UTC
     PRIMARY KEY (host_id, site_id, horario)
 );
+
+CREATE TABLE IF NOT EXISTS console_estado (
+    host_id                TEXT NOT NULL,   -- console (id da Site Manager)
+    coletado_em            TEXT NOT NULL,   -- quando o coletor gravou, em UTC
+    nome                   TEXT,
+    modelo                 TEXT,
+    tipo                   TEXT,            -- console ou network-server
+    conectado              INTEGER,         -- 1 = conectado à nuvem, 0 = não
+    estado                 TEXT,            -- valor original da API
+    versao_os              TEXT,            -- UniFi OS (só consoles)
+    versao_network         TEXT,            -- aplicação Network
+    atualizacao_disponivel TEXT,            -- versão nova do UniFi OS, se houver
+    ultimo_backup          TEXT,            -- último backup em nuvem, em UTC
+    mudou_estado_em        TEXT,            -- última troca conectado/desconectado, em UTC
+    wans_conectadas        INTEGER,
+    PRIMARY KEY (host_id, coletado_em)
+);
 """
 
 

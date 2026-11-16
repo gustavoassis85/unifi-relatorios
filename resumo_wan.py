@@ -40,18 +40,36 @@ def main():
         horario = datetime.fromisoformat(linha["horario"].replace("Z", "+00:00")).astimezone(FUSO)
         links[(linha["host_id"], linha["site_id"])][horario.date()].append(linha)
 
+    hoje = datetime.now(FUSO).date()
+
     for (host_id, site_id), dias in links.items():
         provedor = next((l["provedor"] for d in dias.values() for l in d if l["provedor"]), "?")
         print(f"\nLink {provedor} | console {host_id[:12]}... | site {site_id}")
-        print(f"{'Dia':<12}{'Horas':>6}{'Lat. média':>12}{'Perda média':>13}{'Pior hora':>11}{'Uptime':>9}")
-        for dia, horas in sorted(dias.items()):
+        print(
+            f"{'Dia':<12}{'Horas':>6}{'Sem dado':>10}{'Lat. média':>12}"
+            f"{'Perda média':>13}{'Pior hora':>11}{'Uptime':>9}"
+        )
+        dias_ordenados = sorted(dias.items())
+        buracos = []
+        for i, (dia, horas) in enumerate(dias_ordenados):
+            # O primeiro dia da janela e o dia de hoje são naturalmente incompletos.
+            completo = i > 0 and dia != hoje
+            sem_dado = 24 - len(horas) if completo else None
+            if sem_dado:
+                buracos.append(f"{dia.strftime('%d/%m')} ({sem_dado}h)")
             print(
                 f"{dia.strftime('%d/%m/%Y'):<12}"
                 f"{len(horas):>6}"
+                f"{'-' if sem_dado is None else str(sem_dado) + 'h':>10}"
                 f"{_fmt(_media(h['latencia_media'] for h in horas), ' ms'):>12}"
                 f"{_fmt(_media(h['perda_pct'] for h in horas), '%'):>13}"
                 f"{_fmt(_maximo(h['perda_pct'] for h in horas), '%'):>11}"
                 f"{_fmt(_media(h['uptime_pct'] for h in horas), '%'):>9}"
+            )
+        if buracos:
+            print(
+                f"\nAtenção: horas sem dado em {', '.join(buracos)}. Hora sem dado pode ser queda "
+                "do link ou do console; o uptime acima só considera as horas que chegaram."
             )
 
 
