@@ -58,9 +58,11 @@ Connector (API Network de cada console, via nuvem):
 3. Coletor de consoles (hosts).  (feito)
 4. Coletor de equipamentos (connector) com controle de ritmo.  (feito)
    4b. Agendamento: coletar.py de hora em hora pelo Agendador de Tarefas do Windows (log em dados/coleta.log).  (feito)
-5. Motor de achados (regras com severidade, evidência e recomendação).  ← em andamento
+5. Motor de achados (regras com severidade, evidência e recomendação).  (feito)
    achados/regras.py: limites ajustáveis em LIMITES; notas DPS de 0 a 100 por pilar (alta -25, média -10, baixa -5, info 0).
-6. Relatório PDF do lab.
+6. Relatório PDF do lab.  ← em andamento
+   gerar_relatorio.py gera HTML por console em dados/relatorios/ (marca do MSP em relatorio/marca.json); PDF por Ctrl+P no navegador. PDF automático (Playwright) fica para depois.
+   Pendências conhecidas: juntar achados relacionados num incidente (ex.: horas sem dado + perda alta no mesmo dia); registros antigos (network-server) vão para uma seção de higiene da conta, não para relatório de cliente.
 7. Piloto com um MSP.
 
 ## Estrutura de pastas
@@ -75,6 +77,7 @@ unifi-relatorios/
   resumo_consoles.py (situação atual de cada console)
   resumo_equipamentos.py (saúde, portas, Wi-Fi e clientes de cada site)
   ver_achados.py    (achados do período por console, com notas DPS; --dias N)
+  gerar_relatorio.py (relatório HTML por console; --dias N, --mes AAAA-MM, --console nome)
   teste_conexao.py  (teste rápido da chave)
   coletor/          (cliente HTTP da api.ui.com e um módulo por coleta)
   banco/            (modelo e acesso ao banco)

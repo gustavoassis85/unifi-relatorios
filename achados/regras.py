@@ -117,6 +117,17 @@ def _wan_por_site(conexao, inicio, fim):
     return sites
 
 
+def _intervalo(inicio, horas):
+    """Texto de um intervalo de horas: '26/10 16h (1h)', '26/10 das 08h às 12h (4h)' ou
+    'de 26/10 18h a 27/10 07h (13h)'."""
+    fim = inicio + timedelta(hours=horas)
+    if horas == 1:
+        return f"{_hora(inicio)} (1h)"
+    if fim.date() == inicio.date():
+        return f"{inicio:%d/%m} das {inicio:%H}h às {fim:%H}h ({horas}h)"
+    return f"de {_hora(inicio)} a {_hora(fim)} ({horas}h)"
+
+
 def _agrupar_horas(horas):
     """Agrupa horas consecutivas: [(início, quantidade de horas), ...]."""
     grupos = []
@@ -146,7 +157,7 @@ def regra_wan_sem_dado(conexao, inicio, fim):
         maior = max(n for _, n in sequencias)
         grave = (len(faltando) >= LIMITES["wan_horas_sem_dado_alta"]
                  or maior >= LIMITES["wan_sequencia_sem_dado_alta"])
-        partes = [f"de {_hora(ini)} a {_hora(ini + timedelta(hours=n))} ({n}h)" for ini, n in sequencias[:5]]
+        partes = [_intervalo(ini, n) for ini, n in sequencias[:5]]
         if len(sequencias) > 5:
             partes.append(f"mais {_qtd(len(sequencias) - 5, 'intervalo', 'intervalos')}")
         achados.append(Achado(
