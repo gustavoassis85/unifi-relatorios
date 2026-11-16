@@ -14,6 +14,7 @@ from statistics import mean
 
 from achados.regras import FUSO, LIMITES, _chave, _dt, avaliar
 from relatorio import graficos
+from relatorio.icones import icone
 
 PASTA = Path(__file__).resolve().parent
 SEVERIDADE = {  # rótulo e classe de cor
@@ -41,10 +42,10 @@ def _num(valor, casas=1):
 
 def _situacao(achados):
     if any(a.severidade == "alta" for a in achados):
-        return "critico", "Rede com pontos críticos que pedem ação no próximo mês."
+        return "critico", "Período com ocorrências críticas na rede."
     if any(a.severidade == "media" for a in achados):
-        return "atencao", "Rede funcionando, com pontos de atenção que merecem acompanhamento."
-    return "ok", "Rede saudável no período, sem pontos de atenção relevantes."
+        return "atencao", "Período com pontos de atenção na rede."
+    return "ok", "Período sem ocorrências relevantes na rede."
 
 
 def _periodo_sql(conexao, sql, inicio, fim, parametros, coluna="coletado_em"):
@@ -236,19 +237,6 @@ def _bloco_achados(achados):
             f'<span class="meta">{len(achados)} no período</span></div>'
             '<table class="tabela"><thead><tr><th>Gravidade</th><th>Ponto de atenção</th><th>Área</th></tr></thead>'
             f'<tbody>{linhas}</tbody></table></section>')
-
-
-def _bloco_passos(achados):
-    acionaveis = [a for a in achados if a.severidade in ("alta", "media")]
-    if not acionaveis:
-        return ""
-    itens = "".join(
-        f'<li><div class="titulo">{escape(a.titulo)}</div><div class="secundario">{escape(a.recomendacao)}</div></li>'
-        for a in acionaveis
-    )
-    return ('<section class="painel painel-quebra"><div class="painel-topo"><h2>Próximos passos</h2>'
-            '<span class="meta">em ordem de prioridade</span></div>'
-            f'<ol class="passos">{itens}</ol></section>')
 
 
 def _bloco_graficos(link):
@@ -465,12 +453,12 @@ def _bloco_aplicativos(aplicativos):
     if not aplicativos:
         return ""
     categorias = "".join(
-        f'<li><span class="cat-nome">{escape(nome)}</span><span class="cat-barra"><i style="width:{pct:.1f}%"></i></span>'
+        f'<li><span class="cat-nome">{icone(nome)}{escape(nome)}</span><span class="cat-barra"><i style="width:{pct:.1f}%"></i></span>'
         f'<span class="cat-valor">{_num(pct, 0)}%</span></li>'
         for nome, _valor, pct in aplicativos["categorias"]
     )
     linhas = "".join(
-        f'<tr><td class="nome">{escape(a["nome"])}</td><td class="area">{escape(a["categoria"])}</td>'
+        f'<tr><td class="nome">{icone(a["categoria"])}{escape(a["nome"])}</td><td class="area">{escape(a["categoria"])}</td>'
         f'<td class="num">{_bytes(a["download"])}</td><td class="num">{_bytes(a["upload"])}</td>'
         f'<td class="num">{a["dispositivos"] if a["dispositivos"] is not None else "-"}</td>'
         f'<td class="num">{_num(a["pct"])}%</td></tr>'
@@ -479,7 +467,7 @@ def _bloco_aplicativos(aplicativos):
     return (
         '<section class="painel painel-quebra"><div class="painel-topo"><h2>Aplicativos na rede</h2>'
         '<span class="meta">total da rede, sem detalhe por pessoa</span></div>'
-        f'<ul class="cat-lista">{categorias}</ul>'
+        f'<ul class="cat-lista">{categorias}</ul>{_nota_nao_identificado(aplicativos)}'
         '<table class="tabela tabela-compacta"><thead><tr><th>Aplicativo</th><th>Categoria</th>'
         '<th class="num">Download</th><th class="num">Upload</th><th class="num">Dispositivos</th>'
         f'<th class="num">Participação</th></tr></thead><tbody>{linhas}</tbody></table></section>'
@@ -515,6 +503,141 @@ def _bloco_clientes(clientes):
         f'<span class="meta">{clientes["quantidade"]} dispositivos no período</span></div>'
         f'<div class="grade-3">{resumo}</div>{tabela}</section>'
     )
+
+
+FAMILIAS_PT = {
+    "smartphone": "Smartphones", "smartphones": "Smartphones", "tablet": "Tablets", "desktop/laptop": "Computadores",
+    "computer": "Computadores", "laptop": "Notebooks", "desktop": "Computadores", "smart tv & set-top box": "TVs e streaming",
+    "smart tv": "TVs", "printer": "Impressoras", "network video recorder": "Gravadores de vídeo (NVR)",
+    "ip camera": "Câmeras IP", "game console": "Videogames", "voip phone": "Telefones VoIP",
+}
+
+
+def _dados_nao_identificado(conexao, host_id, inicio, fim):
+    linhas = conexao.execute(
+        "SELECT familia_id, SUM(bytes) AS b FROM naoident_familia_dia WHERE host_id = ? AND dia BETWEEN ? AND ? "
+        "GROUP BY familia_id", (host_id, *_dias(inicio, fim))
+    ).fetchall()
+    total = sum(l["b"] or 0 for l in linhas)
+    if not total:
+        return []
+    nomes = _catalogo(conexao, "familia")
+    resultado = []
+    for l in sorted(linhas, key=lambda l: -(l["b"] or 0))[:3]:
+        nome = nomes.get(l["familia_id"]) or "Dispositivos não identificados"
+        resultado.append((FAMILIAS_PT.get(nome.lower(), nome), 100 * (l["b"] or 0) / total))
+    return resultado
+
+
+def _nota_nao_identificado(aplicativos):
+    nao_ident = next((pct for nome, _v, pct in aplicativos["categorias"] if nome == "Não identificado"), 0)
+    if nao_ident < 5:
+        return ""
+    origem = ""
+    if aplicativos.get("origem_nao_identificado"):
+        partes = ", ".join(f"{escape(nome)} ({_num(pct, 0)}%)" for nome, pct in aplicativos["origem_nao_identificado"])
+        origem = f"<p>Neste período, a maior parte veio de: {partes}.</p>"
+    return (
+        '<div class="nota-explicativa"><h3>Sobre o tráfego não identificado</h3>'
+        f'<p>{_num(nao_ident, 0)}% do tráfego da rede não foi classificado pelo DPI do UniFi. É comum e '
+        'normalmente inclui:</p><ul>'
+        '<li>conexões criptografadas em que o destino não aparece, como parte do QUIC (HTTP/3), VPNs e DNS seguro;</li>'
+        '<li>tráfego entre redes internas (VLANs) que passa pelo gateway;</li>'
+        '<li>protocolos próprios de câmeras, dispositivos IoT, jogos e sistemas corporativos.</li></ul>'
+        f'{origem}</div>'
+    )
+
+
+def _dados_pico(conexao, host_id, inicio, fim):
+    clientes = defaultdict(list)
+    for l in conexao.execute(
+        "SELECT coletado_em, SUM(total) AS total FROM clientes_amostra WHERE host_id = ? "
+        "AND substr(coletado_em, 1, 19) BETWEEN ? AND ? GROUP BY coletado_em",
+        (host_id, _chave(inicio), _chave(fim)),
+    ):
+        clientes[_dt(l["coletado_em"]).hour].append(l["total"] or 0)
+    consumo = defaultdict(list)
+    ini_local, fim_local = inicio.astimezone(FUSO).strftime("%Y-%m-%dT%H"), fim.astimezone(FUSO).strftime("%Y-%m-%dT%H")
+    for l in conexao.execute(
+        "SELECT hora, SUM(download_bytes) AS d FROM internet_hora WHERE host_id = ? AND hora BETWEEN ? AND ? "
+        "GROUP BY hora", (host_id, ini_local, fim_local),
+    ):
+        consumo[int(l["hora"][11:13])].append((l["d"] or 0) / 1e6)
+    if not clientes and not consumo:
+        return None
+
+    def medias(dados):
+        return [mean(dados[h]) if dados.get(h) else None for h in range(24)]
+
+    def pico(valores):
+        validos = [(v, h) for h, v in enumerate(valores) if v is not None]
+        return max(validos) if validos else None
+
+    media_clientes, media_consumo = medias(clientes), medias(consumo)
+    return {
+        "clientes": media_clientes if clientes else None,
+        "consumo": media_consumo if consumo else None,
+        "pico_clientes": pico(media_clientes) if clientes else None,
+        "pico_consumo": pico(media_consumo) if consumo else None,
+        "amostras": sum(len(v) for v in clientes.values()),
+        "horas_consumo": sum(len(v) for v in consumo.values()),
+    }
+
+
+def _bloco_pico(pico):
+    if not pico:
+        return ""
+    rotulos = [f"{h:02d}h" for h in range(24)]
+    kpis, graficos_html = [], ""
+    if pico["pico_consumo"]:
+        valor, hora = pico["pico_consumo"]
+        kpis.append(_kpi("Horário de pico de consumo", f"{hora:02d}h às {(hora + 1) % 24:02d}h",
+                         f"média de {_num(valor, 0)} MB de download nessa hora"))
+        graficos_html += ('<h3 class="sub-grafico">Download médio por horário</h3>'
+                          + graficos.barras(rotulos, pico["consumo"], sufixo=" MB", destaques={rotulos[hora]},
+                                            rotulo="Download médio por horário"))
+    if pico["pico_clientes"]:
+        valor, hora = pico["pico_clientes"]
+        kpis.append(_kpi("Horário de pico de clientes", f"{hora:02d}h às {(hora + 1) % 24:02d}h",
+                         f"média de {_num(valor)} clientes conectados"))
+        graficos_html += ('<h3 class="sub-grafico">Clientes conectados por horário (média)</h3>'
+                          + graficos.barras(rotulos, pico["clientes"], sufixo="", destaques={rotulos[hora]},
+                                            rotulo="Clientes conectados por horário"))
+    return (
+        '<section class="painel"><div class="painel-topo"><h2>Horário de pico</h2>'
+        f'<span class="meta">média por hora do dia, {pico["amostras"]} verificações de clientes</span></div>'
+        f'<div class="kpis kpis-2">{"".join(kpis)}</div>{graficos_html}'
+        '<p class="nota-rodape">Barra em destaque: horário de pico.</p></section>'
+    )
+
+
+def _dados_ssid(conexao, host_id, inicio, fim):
+    dispositivos, simultaneos = defaultdict(set), defaultdict(lambda: defaultdict(int))
+    for a in _periodo_sql(conexao, "SELECT coletado_em, mac, tipo, ssid FROM cliente_amostra WHERE host_id = ?",
+                          inicio, fim, (host_id,)):
+        rede = (a["ssid"] or "Wi-Fi sem nome") if a["tipo"] == "WIRELESS" else "Cabo"
+        dispositivos[rede].add(a["mac"])
+        simultaneos[rede][a["coletado_em"]] += 1
+    if not dispositivos:
+        return None
+    return sorted(((rede, len(macs), max(simultaneos[rede].values())) for rede, macs in dispositivos.items()),
+                  key=lambda item: (item[0] == "Cabo", -item[1]))
+
+
+def _bloco_ssid(redes):
+    if not redes:
+        return ""
+    maior = max(qtd for _r, qtd, _p in redes)
+    itens = "".join(
+        f'<li><span class="cat-nome">{escape(rede)}</span>'
+        f'<span class="cat-barra"><i class="{"barra-cabo" if rede == "Cabo" else ""}" style="width:{100 * qtd / maior:.1f}%"></i></span>'
+        f'<span class="cat-valor largo">{qtd} {"dispositivo" if qtd == 1 else "dispositivos"}'
+        f'<small>pico de {pico} ao mesmo tempo</small></span></li>'
+        for rede, qtd, pico in redes
+    )
+    return ('<section class="painel"><div class="painel-topo"><h2>Conexões por rede</h2>'
+            '<span class="meta">dispositivos por rede Wi-Fi (SSID) e por cabo</span></div>'
+            f'<ul class="cat-lista lista-redes">{itens}</ul></section>')
 
 
 CSS = """
@@ -555,7 +678,7 @@ h2 { font-size: 16px; }
 .painel-quebra { break-inside: auto; page-break-inside: auto;
   -webkit-box-decoration-break: clone; box-decoration-break: clone; }
 .painel > svg, .painel > .legenda, .painel > .kpis, .painel > .nota-rodape,
-.painel > .vazio-texto, .painel > .passos { margin-left: 16px; margin-right: 16px; }
+.painel > .vazio-texto { margin-left: 16px; margin-right: 16px; }
 .painel > svg { width: calc(100% - 32px); margin-top: 16px; }
 .painel-topo { display: flex; justify-content: space-between; align-items: baseline; gap: 16px;
   padding: 12px 16px; border-bottom: 1px solid var(--borda); }
@@ -607,9 +730,6 @@ h2 { font-size: 16px; }
 .kpi-rotulo { color: var(--texto-2); font-size: 12px; line-height: 1.4; }
 .kpi-valor { font-size: 19px; font-weight: 600; line-height: 1.25; margin-top: 4px; }
 
-.passos { margin-top: 16px; margin-bottom: 16px; padding-left: 20px; }
-.passos li { padding: 0 0 12px 4px; break-inside: avoid; page-break-inside: avoid; }
-.passos li::marker { color: var(--texto-3); }
 
 .g-grade { stroke: var(--grade); stroke-width: 1; }
 .g-rotulo { fill: var(--texto-3); font-size: 11px; font-family: inherit; }
@@ -618,12 +738,27 @@ h2 { font-size: 16px; }
 .g-limite { stroke: var(--critico); stroke-width: 1; stroke-dasharray: 4 3; opacity: .8; }
 .g-linha { fill: none; stroke: var(--acento); stroke-width: 2; }
 .g-ponto { fill: var(--acento); }
-.g-down { fill: var(--acento); } .g-up { fill: var(--upload); }
+.g-down { fill: var(--acento); } .g-up { fill: var(--upload); } .g-barra-pico { fill: var(--texto); }
+.icone { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 1.3; stroke-linecap: round;
+  stroke-linejoin: round; color: var(--texto-2); vertical-align: -3px; margin-right: 8px; flex: none; }
+.icone .cheio { fill: currentColor; stroke: none; }
+.cat-nome { display: flex; align-items: center; }
+.kpis-2 { grid-template-columns: repeat(2, 1fr); margin-left: 16px; margin-right: 16px; }
+.sub-grafico { font-size: 14px; font-weight: 500; color: var(--texto-2); margin: 16px 16px 0; }
+.painel > .sub-grafico + svg { margin-top: 8px; }
+.nota-explicativa { margin: 0 16px 16px; padding: 12px 16px; background: var(--painel-2); border: 1px solid var(--borda);
+  border-radius: 6px; color: var(--texto-2); max-width: 75ch; }
+.nota-explicativa h3 { font-size: 14px; font-weight: 500; color: var(--texto); margin: 0 0 4px; }
+.nota-explicativa p { margin: 4px 0; } .nota-explicativa ul { margin: 4px 0; padding-left: 20px; }
+.cat-lista.lista-redes li { grid-template-columns: 240px 1fr 180px; }
+.cat-valor.largo { display: flex; flex-direction: column; align-items: flex-end; color: var(--texto); line-height: 1.3; }
+.cat-valor small { font-size: 12px; color: var(--texto-3); }
+.cat-barra i.barra-cabo { background: var(--texto-3); }
 .kpis-4 { grid-template-columns: repeat(4, 1fr); margin-left: 16px; margin-right: 16px; }
 .espaco { height: 16px; }
 .legenda span + .ponto { margin-left: 8px; }
 .cat-lista { list-style: none; margin: 16px; padding: 0; }
-.cat-lista li { display: grid; grid-template-columns: 200px 1fr 48px; align-items: center; gap: 12px; padding: 4px 0; }
+.cat-lista li { display: grid; grid-template-columns: 240px 1fr 48px; align-items: center; gap: 12px; padding: 4px 0; }
 .cat-barra { height: 8px; background: var(--vazio); border-radius: 4px; overflow: hidden; }
 .cat-barra i { display: block; height: 100%; background: var(--acento); border-radius: 4px; }
 .cat-valor { text-align: right; color: var(--texto-2); }
@@ -648,6 +783,8 @@ footer { margin: 8px 4px 0; max-width: 75ch; }
   .kpis, .kpis-4 { grid-template-columns: repeat(2, 1fr); }
   .grade-3 { grid-template-columns: 1fr; }
   .cat-lista li { grid-template-columns: 120px 1fr 40px; }
+  .cat-lista.lista-redes li { grid-template-columns: 110px 1fr 130px; }
+  .kpis-2 { grid-template-columns: 1fr; }
   .barra { grid-template-columns: 1fr; } .barra-periodo { justify-self: start; }
   .tabela { display: block; overflow-x: auto; }
 }
@@ -664,6 +801,10 @@ def gerar_html(conexao, console, inicio, fim, marca):
     detalhe = _dados_clientes_detalhe(conexao, host_id, inicio, fim)
     consumo = _dados_consumo(conexao, host_id, inicio, fim)
     aplicativos = _dados_aplicativos(conexao, host_id, inicio, fim)
+    if aplicativos:
+        aplicativos["origem_nao_identificado"] = _dados_nao_identificado(conexao, host_id, inicio, fim)
+    pico = _dados_pico(conexao, host_id, inicio, fim)
+    redes = _dados_ssid(conexao, host_id, inicio, fim)
     periodo = f"{inicio.astimezone(FUSO):%d/%m/%Y} a {fim.astimezone(FUSO):%d/%m/%Y}"
     tema = "tema-claro" if marca.get("tema") == "claro" else "tema-escuro"
     classe_situacao, texto_situacao = _situacao(achados)
@@ -682,10 +823,11 @@ def gerar_html(conexao, console, inicio, fim, marca):
 <p class="situacao">{_ponto(classe_situacao)}{texto_situacao}</p>
 <div class="visao">{_bloco_trilho(achados, equipamentos, clientes, detalhe)}{_bloco_link(link)}</div>
 {_bloco_achados(achados)}
-{_bloco_passos(achados)}
 {_bloco_graficos(link)}
 {_bloco_consumo(consumo)}
+{_bloco_pico(pico)}
 {_bloco_aplicativos(aplicativos)}
+{_bloco_ssid(redes)}
 {_bloco_clientes(detalhe)}
 {_bloco_dispositivos(equipamentos, clientes)}
 <footer>Relatório preparado por {escape(marca.get('empresa', ''))}.{contato} A disponibilidade do link

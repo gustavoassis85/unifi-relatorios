@@ -166,6 +166,30 @@ CREATE TABLE IF NOT EXISTS cliente_dia (
     PRIMARY KEY (host_id, site, mac, dia)
 );
 
+-- Consumo da internet do site por hora (para o horário de pico).
+CREATE TABLE IF NOT EXISTS internet_hora (
+    host_id        TEXT NOT NULL,
+    site           TEXT NOT NULL,
+    hora           TEXT NOT NULL,  -- AAAA-MM-DDTHH no horário de Brasília
+    download_bytes INTEGER,
+    upload_bytes   INTEGER,
+    clientes       INTEGER,
+    coletado_em    TEXT NOT NULL,
+    PRIMARY KEY (host_id, site, hora)
+);
+
+-- Tráfego não identificado pelo DPI, somado por família de dispositivo (sem identificar pessoas).
+CREATE TABLE IF NOT EXISTS naoident_familia_dia (
+    host_id      TEXT NOT NULL,
+    site         TEXT NOT NULL,
+    dia          TEXT NOT NULL,
+    familia_id   INTEGER NOT NULL,  -- traduzido pelo catálogo (ex.: computador, smartphone)
+    bytes        INTEGER,
+    dispositivos INTEGER,
+    coletado_em  TEXT NOT NULL,
+    PRIMARY KEY (host_id, site, dia, familia_id)
+);
+
 -- Tráfego por aplicativo, só no total do site (sem detalhe por pessoa, por LGPD).
 CREATE TABLE IF NOT EXISTS aplicativo_dia (
     host_id        TEXT NOT NULL,

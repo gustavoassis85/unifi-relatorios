@@ -3,7 +3,7 @@
 Regras de segurança deste módulo:
 - nada aqui altera configuração: só leitura;
 - GET apenas em caminhos permitidos (lista abaixo);
-- POST apenas nos dois relatórios de consumo do console, que são consultas de leitura mas que a
+- POST apenas nos relatórios de consumo do console (diário e por hora), que são consultas de leitura mas que a
   API só aceita por POST. Nenhum outro POST é possível;
 - nunca mostra a chave em mensagens ou logs.
 """
@@ -29,9 +29,9 @@ GET_PERMITIDOS = (
     re.compile(_CONSOLE + r"/network/v2/api/fingerprint_devices/0$"),       # base de identificação
 )
 
-# POST: somente os relatórios diários de consumo (leitura).
+# POST: somente os relatórios de consumo (leitura): diário do site, diário por cliente e por hora do site.
 POST_PERMITIDOS = (
-    re.compile(_CONSOLE + r"/network/api/s/[^/]+/stat/report/daily\.(site|user)$"),
+    re.compile(_CONSOLE + r"/network/api/s/[^/]+/stat/report/(daily\.(site|user)|hourly\.site)$"),
 )
 
 MAX_TENTATIVAS = 3

@@ -9,6 +9,7 @@ Roda no máximo a cada INTERVALO_HORAS, mesmo com o agendador de hora em hora.
 Na primeira vez busca 30 dias; depois, os últimos dias (para completar o dia de hoje).
 Sentido validado com a tela do UniFi: nos clientes, tx = download e rx = upload.
 """
+from collections import defaultdict
 from datetime import datetime, timedelta, timezone
 
 from banco.banco import conectar
@@ -20,7 +21,8 @@ FUSO = timezone(timedelta(hours=-3))  # Brasília (sem horário de verão desde 
 INTERVALO_HORAS = 6
 DIAS_PRIMEIRA_VEZ = 30
 DIAS_DEPOIS = 3
-NAO_IDENTIFICADO = (255, 65535)  # categoria e aplicativo que o UniFi usa para tráfego não identificado
+NAO_IDENTIFICADO = (255, 65535)
+BUSCAR_HISTORICO = False  # True (coletar.py --forcar): busca de novo os 30 dias, mesmo com dados no banco  # categoria e aplicativo que o UniFi usa para tráfego não identificado
 
 
 def _ms(momento):
@@ -46,7 +48,7 @@ def _relatorios_diarios(conexao, ritmo, host_id, site, agora, coletado_em):
     primeira = conexao.execute(
         "SELECT COUNT(*) FROM internet_dia WHERE host_id = ? AND site = ?", (host_id, site)
     ).fetchone()[0] == 0
-    inicio = agora - timedelta(days=DIAS_PRIMEIRA_VEZ if primeira else DIAS_DEPOIS)
+    inicio = agora - timedelta(days=DIAS_PRIMEIRA_VEZ if primeira or BUSCAR_HISTORICO else DIAS_DEPOIS)
     base = f"/v1/connector/consoles/{host_id}/network/api/s/{site}/stat/report"
     periodo = {"start": _ms(inicio), "end": _ms(agora)}
 
@@ -67,6 +69,18 @@ def _relatorios_diarios(conexao, ritmo, host_id, site, agora, coletado_em):
                 "INSERT OR REPLACE INTO cliente_dia VALUES (?, ?, ?, ?, ?, ?, ?)",
                 (host_id, site, u["user"], _dia(u["time"]), u.get("tx_bytes"), u.get("rx_bytes"), coletado_em),
             )
+    # Por hora (para o horário de pico). Se o console não oferecer, segue sem isso.
+    try:
+        horas = ritmo.consultar(f"{base}/hourly.site",
+                                {"attrs": ["time", "wan-rx_bytes", "wan-tx_bytes", "num_sta"], **periodo})
+        for h in horas.get("data", []):
+            hora = datetime.fromtimestamp(h["time"] / 1000, FUSO).strftime("%Y-%m-%dT%H")
+            conexao.execute(
+                "INSERT OR REPLACE INTO internet_hora VALUES (?, ?, ?, ?, ?, ?, ?)",
+                (host_id, site, hora, h.get("wan-rx_bytes"), h.get("wan-tx_bytes"), h.get("num_sta"), coletado_em),
+            )
+    except ErroApi:
+        pass
     return len(dias.get("data", [])), len(usuarios.get("data", []))
 
 
@@ -75,13 +89,27 @@ def _aplicativos(conexao, ritmo, host_id, site, agora, coletado_em):
         "SELECT COUNT(*) FROM aplicativo_dia WHERE host_id = ? AND site = ?", (host_id, site)
     ).fetchone()[0] > 0
     hoje = agora.astimezone(FUSO).replace(hour=0, minute=0, second=0, microsecond=0)
-    quantos = DIAS_DEPOIS if tem_dados else DIAS_PRIMEIRA_VEZ
+    quantos = DIAS_DEPOIS if tem_dados and not BUSCAR_HISTORICO else DIAS_PRIMEIRA_VEZ
     caminho = f"/v1/connector/consoles/{host_id}/network/v2/api/site/{site}/traffic"
     dias = 0
     for n in range(quantos - 1, -1, -1):
         inicio = hoje - timedelta(days=n)
         fim = min(inicio + timedelta(days=1), agora)
         resposta = ritmo.get(caminho, {"start": _ms(inicio), "end": _ms(fim), "includeUnidentified": "true"})
+        # Não identificado por família de dispositivo (soma, sem guardar quem é quem).
+        familias = defaultdict(lambda: [0, 0])
+        for uso in (resposta or {}).get("client_usage_by_app") or []:
+            familia = ((uso.get("client") or {}).get("fingerprint") or {}).get("dev_family")
+            nao_ident = sum(a.get("total_bytes") or 0 for a in uso.get("usage_by_app") or []
+                            if a.get("application") == NAO_IDENTIFICADO[1])
+            if nao_ident:
+                familias[familia if familia is not None else -1][0] += nao_ident
+                familias[familia if familia is not None else -1][1] += 1
+        for familia, (total, dispositivos) in familias.items():
+            conexao.execute(
+                "INSERT OR REPLACE INTO naoident_familia_dia VALUES (?, ?, ?, ?, ?, ?, ?)",
+                (host_id, site, inicio.date().isoformat(), familia, total, dispositivos, coletado_em),
+            )
         for app in (resposta or {}).get("total_usage_by_app") or []:
             conexao.execute(
                 "INSERT OR REPLACE INTO aplicativo_dia VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",

@@ -7,7 +7,7 @@ import math
 from html import escape
 
 LARGURA, ALTURA = 680, 200
-MARGEM_ESQ, MARGEM_DIR, MARGEM_TOPO, MARGEM_BASE = 44, 8, 12, 32
+MARGEM_ESQ, MARGEM_DIR, MARGEM_TOPO, MARGEM_BASE = 58, 8, 12, 32
 
 
 def _num(valor, casas=1):
@@ -72,7 +72,7 @@ def faixa_dias(rotulos, estados, rotulo=""):
             f'<div class="faixa-barras">{barras_html}</div><div class="faixa-rotulos">{rotulos_html}</div></div>')
 
 
-def barras(rotulos, valores, limite=None, sufixo="%", marcados=(), parciais=(), rotulo=""):
+def barras(rotulos, valores, limite=None, sufixo="%", marcados=(), parciais=(), rotulo="", destaques=()):
     """Barras por dia. Acima do limite: destaque de alerta. Dias em 'parciais' (poucos dados):
     cor neutra. Dias em 'marcados' ganham um triângulo na base (horas sem dado)."""
     if not valores:
@@ -89,7 +89,9 @@ def barras(rotulos, valores, limite=None, sufixo="%", marcados=(), parciais=(), 
         centros.append(centro)
         if valor is not None:
             h = altura_util * valor / maximo
-            if rotulos[i] in parciais:
+            if rotulos[i] in destaques:
+                classe = "g-barra-pico"
+            elif rotulos[i] in parciais:
                 classe = "g-barra-parcial"
             elif limite is not None and valor >= limite:
                 classe = "g-barra-alerta"

@@ -1,10 +1,15 @@
 """Roda todas as coletas. Se uma falhar, as outras continuam.
 
 Uso (na pasta do projeto, com o ambiente virtual ativo):  python coletar.py
+Para refazer agora as coletas periódicas (consumo e catálogos), buscando de novo os 30 dias:
+    python coletar.py --forcar
 Cada execução também fica registrada em dados/coleta.log (útil quando roda pelo agendador).
 """
+import sys
 from datetime import datetime
 from pathlib import Path
+
+from banco.banco import conectar
 
 from coletor import catalogos, clientes, consoles, consumo, equipamentos, wan
 from coletor.api import ErroApi
@@ -34,6 +39,12 @@ def _registrar(linhas):
 
 
 def main():
+    if "--forcar" in sys.argv:
+        conexao = conectar()
+        with conexao:
+            conexao.execute("DELETE FROM controle_coleta")
+        conexao.close()
+        consumo.BUSCAR_HISTORICO = True
     linhas, falhas = [], 0
     for nome, funcao in COLETAS:
         try:

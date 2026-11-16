@@ -45,6 +45,8 @@ Connector (API Network de cada console, via nuvem):
   - GET {connector}/network/v2/api/site/{site}/traffic?start=ms&end=ms&includeUnidentified=true → total_usage_by_app (application, category, bytes_received = download, bytes_transmitted = upload, client_count) e client_usage_by_app (não usamos: LGPD). application 65535 / category 255 = não identificado.
   - GET {connector}/network/v2/api/fingerprint_devices/0 → os_name_ids, vendor_ids, family_ids, dev_type_ids (tradução).
   - POST {connector}/network/api/s/{site}/stat/report/daily.site e daily.user (consulta de leitura) → wan-rx_bytes = download e wan-tx_bytes = upload do site por dia; por cliente, tx_bytes = download e rx_bytes = upload (validado com a tela do UniFi).
+  - POST {connector}/network/api/s/{site}/stat/report/hourly.site → consumo por hora (horário de pico). Se falhar, o coletor segue sem ele.
+  - Não identificado por família de dispositivo: somado a partir de client_usage_by_app sem guardar quem é quem (tabela naoident_familia_dia).
   - O antigo stat/sitedpi volta vazio (aposentado).
   - Catálogo de DPI pela API oficial: /network/integration/v1/dpi/categories (35) e /dpi/applications (2.112), em inglês.
   - Tráfego por cliente inclui rede local + internet; consumo de internet de verdade só no total do site.
@@ -74,6 +76,8 @@ Connector (API Network de cada console, via nuvem):
 6. Relatório PDF do lab.  ← em andamento
    gerar_relatorio.py gera HTML por console em dados/relatorios/ (marca do MSP em relatorio/marca.json); PDF por Ctrl+P no navegador. PDF automático (Playwright) fica para depois.
    Visual: linguagem do Site Manager da UniFi, para quem já usa a plataforma (tema escuro padrão, claro opcional em marca.json "tema"). Tokens de cor no CSS de relatorio/gerar.py. Regras de UI: 60-30-10 (azul UniFi só em ação/link), bordas finas antes de sombra, no máximo 3 pesos de fonte (400/500/600), nada abaixo de 12px, espaçamento em múltiplos de 4/8px, sem gradientes, pílulas ou decoração. Peça principal: faixa de saúde do link por dia (estável/instável/crítico/poucos dados). Versão exibida = firmware que o Site Manager mostra (console_estado.firmware).
+   Relatório executivo e reativo (decisão de 15/11/2026): sem "próximos passos" nem recomendações no relatório; pontos de atenção mostram só a evidência. Seções: linha do console, resumo, saúde do link, pontos de atenção, perda/latência, consumo da internet, horário de pico, aplicativos (com nota sobre não identificado), conexões por rede (SSID), clientes, equipamentos UniFi. Sem logotipos de aplicativos (marcas de terceiros): ícones genéricos por categoria em relatorio/icones.py.
+   python coletar.py --forcar refaz consumo e catálogos na hora, buscando 30 dias.
    Pendências conhecidas: juntar achados relacionados num incidente (ex.: horas sem dado + perda alta no mesmo dia); registros antigos (network-server) vão para uma seção de higiene da conta, não para relatório de cliente.
 7. Piloto com um MSP.
 
