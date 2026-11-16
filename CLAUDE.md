@@ -57,8 +57,9 @@ Connector (API Network de cada console, via nuvem):
 2. Coletor de WAN (isp-metrics) gravando no banco.  (feito)
 3. Coletor de consoles (hosts).  (feito)
 4. Coletor de equipamentos (connector) com controle de ritmo.  (feito)
-   4b. Agendamento: coletar.py de hora em hora pelo Agendador de Tarefas do Windows (log em dados/coleta.log).  ← em andamento
-5. Motor de achados (regras com severidade, evidência e recomendação).
+   4b. Agendamento: coletar.py de hora em hora pelo Agendador de Tarefas do Windows (log em dados/coleta.log).  (feito)
+5. Motor de achados (regras com severidade, evidência e recomendação).  ← em andamento
+   achados/regras.py: limites ajustáveis em LIMITES; notas DPS de 0 a 100 por pilar (alta -25, média -10, baixa -5, info 0).
 6. Relatório PDF do lab.
 7. Piloto com um MSP.
 
@@ -73,6 +74,7 @@ unifi-relatorios/
   resumo_wan.py     (resumo diário do link, com horas sem dado)
   resumo_consoles.py (situação atual de cada console)
   resumo_equipamentos.py (saúde, portas, Wi-Fi e clientes de cada site)
+  ver_achados.py    (achados do período por console, com notas DPS; --dias N)
   teste_conexao.py  (teste rápido da chave)
   coletor/          (cliente HTTP da api.ui.com e um módulo por coleta)
   banco/            (modelo e acesso ao banco)
