@@ -1,0 +1,37 @@
+from django.contrib import admin
+from django.contrib.auth.admin import UserAdmin
+from django.contrib.auth.forms import UserChangeForm, UserCreationForm
+
+from .models import Usuario
+
+
+class UsuarioCriacaoForm(UserCreationForm):
+    class Meta:
+        model = Usuario
+        fields = ("email", "nome")
+
+
+class UsuarioAlteracaoForm(UserChangeForm):
+    class Meta:
+        model = Usuario
+        fields = ("email", "nome", "is_active", "is_staff", "is_superuser")
+
+
+@admin.register(Usuario)
+class UsuarioAdmin(UserAdmin):
+    add_form = UsuarioCriacaoForm
+    form = UsuarioAlteracaoForm
+    ordering = ("email",)
+    list_display = ("email", "nome", "is_active", "is_staff", "is_superuser")
+    list_filter = ("is_active", "is_staff", "is_superuser")
+    search_fields = ("email", "nome")
+    fieldsets = (
+        (None, {"fields": ("email", "password")}),
+        ("Dados", {"fields": ("nome",)}),
+        ("Acesso", {"fields": ("is_active", "is_staff", "is_superuser")}),
+        ("Datas", {"fields": ("last_login", "criado_em")}),
+    )
+    readonly_fields = ("last_login", "criado_em")
+    add_fieldsets = (
+        (None, {"classes": ("wide",), "fields": ("email", "nome", "password1", "password2")}),
+    )
