@@ -4,8 +4,9 @@ Para cada console conectado:
 - lista os sites e grava a quantidade de clientes conectados (cabo e Wi-Fi);
 - grava uma foto de cada equipamento: estado, firmware, CPU, memória, uptime, uplink e
   retransmissão dos rádios;
-- 1x por dia, grava o detalhe de cada equipamento: portas (velocidade negociada, PoE) e rádios
-  (padrão, canal, largura).
+- grava também o detalhe de cada equipamento: portas (velocidade negociada, PoE) e rádios
+  (padrão, canal, largura). É coletado em toda execução porque uma foto só engana: um PC em
+  repouso negocia 10/100 Mbps, e a regra de "porta abaixo da capacidade" precisa de várias amostras.
 
 Ritmo: a API aceita 100 chamadas por minuto por console. Fazemos no máximo ~85.
 Se um console ou equipamento falhar, os outros continuam.
@@ -85,14 +86,7 @@ def _gravar_detalhe(conexao, device_id, detalhe, agora):
         )
 
 
-def _detalhe_ja_coletado_hoje(conexao, device_id, hoje):
-    ultimo = conexao.execute(
-        "SELECT MAX(coletado_em) FROM equipamento_detalhe WHERE device_id = ?", (device_id,)
-    ).fetchone()[0]
-    return ultimo is not None and ultimo[:10] == hoje
-
-
-def _coletar_equipamento(conexao, ritmo, base, host_id, site_id, equipamento, agora, hoje):
+def _coletar_equipamento(conexao, ritmo, base, host_id, site_id, equipamento, agora):
     """Grava a foto de um equipamento. Devolve quantas chamadas dele falharam."""
     device_id = equipamento.get("id")
     caminho = f"{base}/sites/{site_id}/devices/{device_id}"
@@ -127,15 +121,14 @@ def _coletar_equipamento(conexao, ritmo, base, host_id, site_id, equipamento, ag
             (device_id, agora, posicao, radio.get("frequencyGHz"), radio.get("txRetriesPct")),
         )
 
-    if not _detalhe_ja_coletado_hoje(conexao, device_id, hoje):
-        try:
-            _gravar_detalhe(conexao, device_id, ritmo.get(caminho), agora)
-        except ErroApi:
-            falhas += 1
+    try:
+        _gravar_detalhe(conexao, device_id, ritmo.get(caminho), agora)
+    except ErroApi:
+        falhas += 1
     return falhas
 
 
-def _coletar_console(conexao, host_id, agora, hoje):
+def _coletar_console(conexao, host_id, agora):
     """Coleta sites, clientes e equipamentos de um console."""
     ritmo = Ritmo()
     base = f"/v1/connector/consoles/{host_id}/network/integration/v1"
@@ -160,7 +153,7 @@ def _coletar_console(conexao, host_id, agora, hoje):
 
         for equipamento in _todos(ritmo, f"{base}/sites/{site_id}/devices"):
             resultado["falhas"] += _coletar_equipamento(
-                conexao, ritmo, base, host_id, site_id, equipamento, agora, hoje
+                conexao, ritmo, base, host_id, site_id, equipamento, agora
             )
             resultado["equipamentos"] += 1
 
@@ -170,8 +163,7 @@ def _coletar_console(conexao, host_id, agora, hoje):
 
 def coletar():
     """Coleta todos os consoles conectados e devolve um resumo em texto."""
-    agora_dt = datetime.now(timezone.utc)
-    agora, hoje = agora_dt.isoformat(timespec="seconds"), agora_dt.date().isoformat()
+    agora = datetime.now(timezone.utc).isoformat(timespec="seconds")
 
     conexao = conectar()
     try:
@@ -184,7 +176,7 @@ def coletar():
         for console in consoles:
             try:
                 with conexao:  # grava o console inteiro de uma vez (ou nada, se ele falhar)
-                    resultado = _coletar_console(conexao, console["host_id"], agora, hoje)
+                    resultado = _coletar_console(conexao, console["host_id"], agora)
                 for chave in total:
                     total[chave] += resultado[chave]
             except ErroApi as erro:

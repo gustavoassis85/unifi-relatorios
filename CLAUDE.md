@@ -43,7 +43,8 @@ Connector (API Network de cada console, via nuvem):
 
 ## Regras obrigatórias do código
 - Só requisições GET, com lista fixa de caminhos permitidos. Pelo connector, só /network/integration/v1/.
-- Connector: no máximo ~85 chamadas/min por console (classe Ritmo em coletor/equipamentos.py); detalhe de portas/rádios 1x por dia.
+- Connector: no máximo ~85 chamadas/min por console (classe Ritmo em coletor/equipamentos.py).
+- Detalhe de portas/rádios em toda coleta: uma foto só engana (PC em repouso negocia 10/100 Mbps). Regra de "porta abaixo da capacidade" só vira achado se persistir em várias amostras.
 - Chave da API no arquivo .env. Nunca no código, nunca no Git. .env listado no .gitignore.
 - Nunca imprimir a chave em log ou mensagem de erro.
 - A chave nunca é colada no chat. Para conferir o .env sem expor a chave:
@@ -55,7 +56,8 @@ Connector (API Network de cada console, via nuvem):
 1. Ambiente: pasta, ambiente virtual Python, Git, .env, .gitignore.  (feito)
 2. Coletor de WAN (isp-metrics) gravando no banco.  (feito)
 3. Coletor de consoles (hosts).  (feito)
-4. Coletor de equipamentos (connector) com controle de ritmo.  ← em andamento
+4. Coletor de equipamentos (connector) com controle de ritmo.  (feito)
+   4b. Agendamento: coletar.py de hora em hora pelo Agendador de Tarefas do Windows (log em dados/coleta.log).  ← em andamento
 5. Motor de achados (regras com severidade, evidência e recomendação).
 6. Relatório PDF do lab.
 7. Piloto com um MSP.
