@@ -1,20 +1,38 @@
 # Dashboard UniFi — contexto do projeto
 
 ## O que é
-SaaS de relatórios para MSPs que usam UniFi. Primeiro produto: relatório mensal de saúde da rede por cliente do MSP, em PDF com a marca do MSP. Os pontos de atenção são separados pela área afetada (Internet, Console, Equipamentos, Wi-Fi, Conta), sem notas nem metodologia própria (decisão de 15/11/2026: a análise DPS saiu do produto).
+SaaS de relatórios para MSPs que usam UniFi. Produto: relatório de saúde da rede por cliente do MSP, em PDF com a marca do MSP. Os pontos de atenção são separados pela área afetada (Internet, Console, Equipamentos, Wi-Fi, Conta), sem notas nem metodologia própria (decisão de 15/11/2026: a análise DPS saiu do produto).
+
+Duas fases:
+- Fase 1, MVP do lab (concluída): scripts Python na raiz do projeto que coletam, geram os pontos de atenção e montam o relatório HTML de um ambiente.
+- Fase 2, sistema (em construção): aplicação web multi-tenant em sistema/, que reaproveita os coletores, as regras e o relatório do MVP.
 
 ## Como trabalhar com o Gustavo
-- Ele não é desenvolvedor. Guiar passo a passo, um passo por vez, com comandos prontos para PowerShell (Windows).
-- Explicar o que cada comando faz em uma linha.
+- Ele não é desenvolvedor. Guiar passo a passo, um passo por vez.
+- Ambiente: Windows, PowerShell, VS Code com o Claude Code.
+- Antes de rodar um comando, explicar em uma linha o que ele faz.
+- Pedir aprovação antes de instalar programas no Windows ou mudar algo fora da pasta do projeto.
+- Em etapas grandes, apresentar o plano antes de escrever código.
+- Ao fim de cada etapa que funcionar: rodar os testes e fazer o commit.
 - Respostas curtas, sem negrito.
 
-## Decisões (15/11/2026)
+## Decisões
+MVP (15/11/2026):
 - Construção: Gustavo com IA. Um dev revisa a segurança antes do primeiro cliente pagante.
-- MVP sem portal web: coletor + banco + PDF por e-mail. Cadastro de MSP feito à mão.
 - Acesso só pela nuvem (api.ui.com) com a chave Site Manager do MSP. Sem agente, sem VPN. Validado em 15/11/2026.
-- Linguagem: Python.
-- Banco: SQLite local no desenvolvimento (zero instalação); Postgres gerenciado em produção. Escrever o acesso ao banco de forma que a troca seja simples.
-- PDF: modelo HTML → PDF. Ferramenta a definir no passo 6 (WeasyPrint exige dependências extras no Windows; Playwright é mais simples de instalar).
+- Linguagem: Python. Banco do MVP: SQLite local (dados/).
+
+Sistema (15/11/2026):
+- Aplicação web multi-tenant, no modelo do multi-site da UniFi: Organização (MSP) → Clientes → Consoles/Sites. Um MSP nunca enxerga outro.
+- Hospedagem: SaaS na nuvem, hospedado pelo Gustavo para todos os MSPs.
+- Acesso: só o MSP tem login. O cliente final recebe o relatório por e-mail ou PDF, sem login. Papéis dentro da organização: admin, operador, leitura.
+- O dono da plataforma cria as organizações e o primeiro admin de cada uma, mas não vê os dados dos clientes dos MSPs pela aplicação.
+- Stack: Python + Django 5.2 LTS + HTMX + PostgreSQL. Processo em segundo plano para coletas, relatórios e agendamentos. PDF no servidor com Playwright (Chromium sem tela).
+- Conexão com a UniFi: pela nuvem (chave unifi.ui.com) primeiro; IP direto depois, e vai exigir VPN entre o servidor e a rede do cliente.
+- Funcionalidades: clientes e conexões (com "Testar conexão"), relatórios sob demanda com histórico, agendamentos (frequência, dia, hora, destinatários), SMTP por organização com envio de teste. Sem SMTP, o agendamento só gera o PDF e deixa na tela.
+- Um único modelo de relatório: o do MVP.
+- Cobrança: a definir depois.
+- Plano completo: Claude Doc "Plano do sistema Dashboard UniFi" (https://claude.ai/artifact/Cpr1bsN4jYhU9PMkyEvTx3).
 
 ## APIs validadas
 Base: https://api.ui.com — header X-API-Key — certificado válido (não usar verify=False).
@@ -39,6 +57,7 @@ Connector (API Network de cada console, via nuvem):
   - sites/{siteId}/wans → id, name
 - Paginação: offset, limit (padrão 25), count, totalCount.
 - Limites: 100 req/min por console (erro 429 com Retry-After), timeout de 25 s, resposta até 10 MB.
+- O connector aceita todos os métodos HTTP: a chave consegue alterar configuração. Só o nosso código garante a leitura.
 - IDs: o siteId da Site Manager (hex) é diferente do siteId da Network (UUID). Ligação pelo hostId.
 - Dados por cliente e consumo: não existem na API oficial (nem na v11.0.97). Vêm das APIs internas do Network, que a chave da nuvem acessa pelo connector (validado em 15/11/2026):
   - GET {connector}/network/v2/api/site/{site}/clients/active → nome, type (WIRELESS/WIRED), oui (fabricante), model_name (tipo), fingerprint.os_name (código do SO), essid, signal, wifi_experience_score, wifi_tx_retries_percentage, sw_port, wired_rate_mbps, tx_bytes/rx_bytes desde a conexão.
@@ -53,33 +72,68 @@ Connector (API Network de cada console, via nuvem):
   - São rotas não documentadas: podem mudar numa atualização. O relatório tem que sair mesmo se elas falharem.
 
 ## Regras obrigatórias do código
-- Só leitura. GET apenas nos caminhos de coletor/api.py (GET_PERMITIDOS). POST apenas nos relatórios daily.site e daily.user (POST_PERMITIDOS), que são consultas.
+Coleta (MVP e sistema):
+- Só leitura. GET apenas nos caminhos de coletor/api.py (GET_PERMITIDOS). POST apenas nos relatórios daily.site, daily.user e hourly.site (POST_PERMITIDOS), que são consultas.
 - LGPD: aplicativos só no total da rede; não coletamos nem mostramos uso de aplicativo por pessoa/dispositivo.
 - Connector: no máximo ~85 chamadas/min por console (classe Ritmo em coletor/equipamentos.py).
 - Detalhe de portas/rádios em toda coleta: uma foto só engana (PC em repouso negocia 10/100 Mbps). Regra de "porta abaixo da capacidade" só vira achado se persistir em várias amostras.
-- Chave da API no arquivo .env. Nunca no código, nunca no Git. .env listado no .gitignore.
-- Nunca imprimir a chave em log ou mensagem de erro.
-- A chave nunca é colada no chat. Para conferir o .env sem expor a chave:
-  python -c "from dotenv import dotenv_values; print({n: len(v or '') for n, v in dotenv_values('.env').items()})"
 - Não guardar e-mail, coordenadas ou dados de usuários vindos de /v1/hosts (LGPD).
 - Respeitar Retry-After; falha em uma coleta não derruba as outras; console offline é registrado como indisponível.
 
-## Ordem de construção (fase 1)
-1. Ambiente: pasta, ambiente virtual Python, Git, .env, .gitignore.  (feito)
-2. Coletor de WAN (isp-metrics) gravando no banco.  (feito)
-3. Coletor de consoles (hosts).  (feito)
-4. Coletor de equipamentos (connector) com controle de ritmo.  (feito)
-   4b. Agendamento: coletar.py de hora em hora pelo Agendador de Tarefas do Windows (log em dados/coleta.log).  (feito)
-   4c. Clientes (de hora em hora), consumo diário e aplicativos (a cada 6h, 30 dias na primeira vez) e catálogos (1x por semana): coletor/clientes.py, coletor/consumo.py, coletor/catalogos.py. Controle de frequência na tabela controle_coleta.  (feito)
-5. Motor de achados (regras com severidade, evidência e recomendação).  (feito)
-   achados/regras.py: limites ajustáveis em LIMITES; cada achado tem área, severidade (alta, média, baixa, informativo), evidência e recomendação.
-6. Relatório PDF do lab.  ← em andamento
-   gerar_relatorio.py gera HTML por console em dados/relatorios/ (marca do MSP em relatorio/marca.json); PDF por Ctrl+P no navegador. PDF automático (Playwright) fica para depois.
-   Visual: linguagem do Site Manager da UniFi, para quem já usa a plataforma (tema escuro padrão, claro opcional em marca.json "tema"). Tokens de cor no CSS de relatorio/gerar.py. Regras de UI: 60-30-10 (azul UniFi só em ação/link), bordas finas antes de sombra, no máximo 3 pesos de fonte (400/500/600), nada abaixo de 12px, espaçamento em múltiplos de 4/8px, sem gradientes, pílulas ou decoração. Peça principal: faixa de saúde do link por dia (estável/instável/crítico/poucos dados). Versão exibida = firmware que o Site Manager mostra (console_estado.firmware).
-   Relatório executivo e reativo (decisão de 15/11/2026): sem "próximos passos" nem recomendações no relatório; pontos de atenção mostram só a evidência. Seções: linha do console, resumo, saúde do link, pontos de atenção, perda/latência, consumo da internet, horário de pico, aplicativos (com nota sobre não identificado), conexões por rede (SSID), clientes, equipamentos UniFi. Sem logotipos de aplicativos (marcas de terceiros): ícones genéricos por categoria em relatorio/icones.py.
+Segredos:
+- Chaves e senhas no arquivo .env no desenvolvimento. Nunca no código, nunca no Git. .env listado no .gitignore; .env.example (sem valores) vai para o Git.
+- Nunca imprimir chave ou senha em log ou mensagem de erro.
+- A chave nunca é colada no chat. Para conferir o .env sem expor valores:
+  python -c "from dotenv import dotenv_values; print({n: len(v or '') for n, v in dotenv_values('.env').items()})"
+- No sistema: chaves da UniFi e senhas de SMTP criptografadas no banco, com a chave mestra em variável de ambiente. Depois de salvas, só aparecem os últimos 4 caracteres.
+
+Isolamento entre MSPs (sistema):
+- Toda tabela com dado de MSP tem o ID da organização, e todo acesso passa por uma camada única que filtra por ela.
+- Segunda trava no banco: Row-Level Security do PostgreSQL com FORCE ROW LEVEL SECURITY. A aplicação conecta com um usuário do banco que não é dono das tabelas, não é superusuário e não tem BYPASSRLS. Migrações rodam com outro usuário.
+- Sem organização definida na conexão, as tabelas de MSP não devolvem nenhuma linha.
+- Testes de isolamento obrigatórios, sempre no PostgreSQL (nunca SQLite): usuário do MSP A tentando ver, editar ou apagar dado do MSP B pela tela e direto no banco. Nenhuma mudança entra se esses testes falharem.
+- O admin do Django só gerencia organizações e usuários. Dados dos clientes dos MSPs ficam fora do admin.
+
+Segurança da aplicação (sistema):
+- MFA obrigatório para admins, bloqueio após tentativas de login, cookies seguros, CSRF, cabeçalhos de segurança (CSP, HSTS em produção).
+- DEBUG e SECRET_KEY vêm do ambiente; DEBUG desligado por padrão.
+- Log de auditoria: quem cadastrou, gerou, enviou ou apagou o quê.
+- LGPD: coleta mínima, retenção definida e exclusão de todos os dados de um MSP quando ele sair.
+- IP direto (quando chegar): nunca desligar a verificação de certificado; gravar a impressão digital do certificado do console e recusar a conexão se ela mudar.
+
+Git:
+- main sempre funcionando; uma branch por etapa ou funcionalidade; tag a cada versão que for para produção.
+- .env e dados/ nunca vão para o Git.
+
+## Ordem de construção
+Fase 1, MVP do lab (concluída):
+1. Ambiente: pasta, ambiente virtual Python, Git, .env, .gitignore.
+2. Coletor de WAN (isp-metrics) gravando no banco.
+3. Coletor de consoles (hosts).
+4. Coletor de equipamentos (connector) com controle de ritmo.
+   4b. Agendamento: coletar.py de hora em hora pelo Agendador de Tarefas do Windows (log em dados/coleta.log).
+   4c. Clientes (de hora em hora), consumo diário e aplicativos (a cada 6h, 30 dias na primeira vez) e catálogos (1x por semana): coletor/clientes.py, coletor/consumo.py, coletor/catalogos.py. Controle de frequência na tabela controle_coleta.
+5. Motor de achados: achados/regras.py, limites ajustáveis em LIMITES; cada achado tem área, severidade (alta, média, baixa, informativo), evidência e recomendação.
+6. Relatório do lab: gerar_relatorio.py gera HTML por console em dados/relatorios/ (marca do MSP em relatorio/marca.json); PDF por Ctrl+P no navegador.
    python coletar.py --forcar refaz consumo e catálogos na hora, buscando 30 dias.
-   Pendências conhecidas: juntar achados relacionados num incidente (ex.: horas sem dado + perda alta no mesmo dia); registros antigos (network-server) vão para uma seção de higiene da conta, não para relatório de cliente.
-7. Piloto com um MSP.
+
+Fase 2, sistema (em sistema/):
+1. Fundação: projeto Django, PostgreSQL, login com MFA, organizações, papéis, isolamento e testes de isolamento.  ← próxima (detalhe em planos/etapa-1-fundacao.md)
+2. Clientes e conexões: cadastro, cofre de credenciais e "Testar conexão" (nuvem primeiro, IP direto depois).
+3. Coletores rodando por organização, em segundo plano (os módulos de coletor/ passam para o sistema).
+4. Relatórios sob demanda e PDF automático (Playwright). Entram aqui as pendências do relatório: juntar achados relacionados num incidente (ex.: horas sem dado + perda alta no mesmo dia); registros antigos (network-server) vão para uma seção de higiene da conta, não para o relatório do cliente.
+5. Agendamentos, SMTP e o fallback para PDF.
+6. Publicação num servidor, com backup e monitoramento, e revisão de segurança por um dev antes do primeiro MSP pagante.
+
+O código do MVP continua na raiz e a coleta agendada do lab segue rodando até o sistema substituí-la. Não alterar o MVP sem pedido explícito.
+
+## Relatório (vale para o MVP e para o sistema)
+- Visual: linguagem do Site Manager da UniFi, para quem já usa a plataforma (tema escuro padrão, claro opcional em marca.json "tema"). Tokens de cor no CSS de relatorio/gerar.py.
+- Regras de UI: 60-30-10 (azul UniFi só em ação/link), bordas finas antes de sombra, no máximo 3 pesos de fonte (400/500/600), nada abaixo de 12px, espaçamento em múltiplos de 4/8px, sem gradientes, pílulas ou decoração.
+- Peça principal: faixa de saúde do link por dia (estável/instável/crítico/poucos dados). Versão exibida = firmware que o Site Manager mostra (console_estado.firmware).
+- Executivo e reativo (decisão de 15/11/2026): sem "próximos passos" nem recomendações; pontos de atenção mostram só a evidência.
+- Seções: linha do console, resumo, saúde do link, pontos de atenção, perda/latência, consumo da internet, horário de pico, aplicativos (com nota sobre não identificado), conexões por rede (SSID), clientes, equipamentos UniFi.
+- Sem logotipos de aplicativos (marcas de terceiros): ícones genéricos por categoria em relatorio/icones.py.
 
 ## Estrutura de pastas
 ```
@@ -88,6 +142,10 @@ unifi-relatorios/
   .env              (não vai para o Git)
   .gitignore
   requirements.txt
+  planos/           (detalhe de cada etapa do sistema)
+  sistema/          (fase 2: projeto Django, criado na etapa 1)
+
+  MVP (fase 1):
   coletar.py        (roda todas as coletas; uma falha não derruba as outras)
   resumo_wan.py     (resumo diário do link, com horas sem dado)
   resumo_consoles.py (situação atual de cada console)
@@ -96,10 +154,10 @@ unifi-relatorios/
   gerar_relatorio.py (relatório HTML por console; --dias N, --mes AAAA-MM, --console nome)
   teste_conexao.py  (teste rápido da chave)
   coletor/          (cliente HTTP da api.ui.com e um módulo por coleta)
-  banco/            (modelo e acesso ao banco)
+  banco/            (modelo e acesso ao banco SQLite)
   achados/          (regras)
-  relatorio/        (modelos HTML e geração do PDF)
-  dados/            (arquivo SQLite local, fora do Git)
+  relatorio/        (modelo HTML do relatório)
+  dados/            (SQLite local e relatórios gerados, fora do Git)
 ```
 
 ## Lab de testes
