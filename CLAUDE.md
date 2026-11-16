@@ -42,7 +42,8 @@ Connector (API Network de cada console, via nuvem):
 - IDs: o siteId da Site Manager (hex) é diferente do siteId da Network (UUID). Ligação pelo hostId.
 
 ## Regras obrigatórias do código
-- Só requisições GET, com lista fixa de caminhos permitidos.
+- Só requisições GET, com lista fixa de caminhos permitidos. Pelo connector, só /network/integration/v1/.
+- Connector: no máximo ~85 chamadas/min por console (classe Ritmo em coletor/equipamentos.py); detalhe de portas/rádios 1x por dia.
 - Chave da API no arquivo .env. Nunca no código, nunca no Git. .env listado no .gitignore.
 - Nunca imprimir a chave em log ou mensagem de erro.
 - A chave nunca é colada no chat. Para conferir o .env sem expor a chave:
@@ -53,8 +54,8 @@ Connector (API Network de cada console, via nuvem):
 ## Ordem de construção (fase 1)
 1. Ambiente: pasta, ambiente virtual Python, Git, .env, .gitignore.  (feito)
 2. Coletor de WAN (isp-metrics) gravando no banco.  (feito)
-3. Coletor de consoles (hosts).  ← em andamento
-4. Coletor de equipamentos (connector) com controle de ritmo.
+3. Coletor de consoles (hosts).  (feito)
+4. Coletor de equipamentos (connector) com controle de ritmo.  ← em andamento
 5. Motor de achados (regras com severidade, evidência e recomendação).
 6. Relatório PDF do lab.
 7. Piloto com um MSP.
@@ -69,6 +70,7 @@ unifi-relatorios/
   coletar.py        (roda todas as coletas; uma falha não derruba as outras)
   resumo_wan.py     (resumo diário do link, com horas sem dado)
   resumo_consoles.py (situação atual de cada console)
+  resumo_equipamentos.py (saúde, portas, Wi-Fi e clientes de cada site)
   teste_conexao.py  (teste rápido da chave)
   coletor/          (cliente HTTP da api.ui.com e um módulo por coleta)
   banco/            (modelo e acesso ao banco)

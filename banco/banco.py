@@ -42,6 +42,93 @@ CREATE TABLE IF NOT EXISTS console_estado (
     wans_conectadas        INTEGER,
     PRIMARY KEY (host_id, coletado_em)
 );
+
+-- Sites vistos pela API Network (o id aqui é o UUID da Network, diferente da Site Manager).
+CREATE TABLE IF NOT EXISTS site_network (
+    host_id       TEXT NOT NULL,
+    site_id       TEXT NOT NULL,
+    nome          TEXT,
+    referencia    TEXT,            -- internalReference (ex.: default)
+    atualizado_em TEXT NOT NULL,
+    PRIMARY KEY (host_id, site_id)
+);
+
+-- Foto de cada equipamento a cada coleta.
+CREATE TABLE IF NOT EXISTS equipamento_amostra (
+    host_id              TEXT NOT NULL,
+    site_id              TEXT NOT NULL,
+    device_id            TEXT NOT NULL,
+    coletado_em          TEXT NOT NULL,
+    nome                 TEXT,
+    modelo               TEXT,
+    mac                  TEXT,
+    ip                   TEXT,
+    estado               TEXT,     -- ONLINE, OFFLINE...
+    firmware             TEXT,
+    firmware_atualizavel INTEGER,  -- 1 = o Network oferece atualização
+    uptime_seg           INTEGER,
+    cpu_pct              REAL,
+    memoria_pct          REAL,
+    carga_1min           REAL,
+    uplink_tx_bps        INTEGER,  -- taxa no momento da coleta, não é volume
+    uplink_rx_bps        INTEGER,
+    PRIMARY KEY (device_id, coletado_em)
+);
+
+-- Retransmissão de cada rádio a cada coleta.
+CREATE TABLE IF NOT EXISTS radio_amostra (
+    device_id         TEXT NOT NULL,
+    coletado_em       TEXT NOT NULL,
+    posicao           INTEGER NOT NULL,  -- ordem do rádio no equipamento
+    frequencia_ghz    REAL,
+    retransmissao_pct REAL,
+    PRIMARY KEY (device_id, coletado_em, posicao)
+);
+
+-- Detalhe do equipamento (1x por dia): configuração, portas e rádios.
+CREATE TABLE IF NOT EXISTS equipamento_detalhe (
+    device_id       TEXT NOT NULL,
+    coletado_em     TEXT NOT NULL,
+    configuracao_id TEXT,
+    provisionado_em TEXT,              -- último envio de configuração, não é a instalação
+    PRIMARY KEY (device_id, coletado_em)
+);
+
+CREATE TABLE IF NOT EXISTS porta_estado (
+    device_id           TEXT NOT NULL,
+    coletado_em         TEXT NOT NULL,
+    idx                 INTEGER NOT NULL,
+    estado              TEXT,          -- UP ou DOWN
+    conector            TEXT,
+    velocidade_mbps     INTEGER,       -- negociada (porta DOWN mostra um valor sem sentido)
+    velocidade_max_mbps INTEGER,
+    poe_padrao          TEXT,
+    poe_ativo           INTEGER,
+    poe_estado          TEXT,
+    PRIMARY KEY (device_id, coletado_em, idx)
+);
+
+CREATE TABLE IF NOT EXISTS radio_config (
+    device_id      TEXT NOT NULL,
+    coletado_em    TEXT NOT NULL,
+    posicao        INTEGER NOT NULL,
+    frequencia_ghz REAL,
+    padrao         TEXT,               -- 802.11n, 802.11ax...
+    largura_mhz    INTEGER,
+    canal          INTEGER,
+    PRIMARY KEY (device_id, coletado_em, posicao)
+);
+
+-- Quantidade de clientes conectados em cada site, a cada coleta.
+CREATE TABLE IF NOT EXISTS clientes_amostra (
+    host_id     TEXT NOT NULL,
+    site_id     TEXT NOT NULL,
+    coletado_em TEXT NOT NULL,
+    total       INTEGER,
+    cabo        INTEGER,
+    wifi        INTEGER,
+    PRIMARY KEY (host_id, site_id, coletado_em)
+);
 """
 
 

@@ -49,6 +49,8 @@ def get(caminho, parametros=None):
     """Faz um GET na api.ui.com e devolve o JSON da resposta."""
     if not caminho.startswith(CAMINHOS_PERMITIDOS):
         raise ErroApi(f"Caminho não permitido: {caminho}")
+    if caminho.startswith("/v1/connector/") and "/network/integration/v1/" not in caminho:
+        raise ErroApi(f"Pelo connector, só a API Network é permitida: {caminho}")
 
     cabecalhos = {"X-API-Key": _chave(), "Accept": "application/json"}
 
