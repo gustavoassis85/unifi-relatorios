@@ -47,10 +47,14 @@ def _eixos(maximo, sufixo):
 
 
 def _rotulos_x(rotulos, posicoes, y):
+    """No máximo ~8 rótulos; o último sempre aparece, e o vizinho próximo dele é omitido."""
     passo = max(1, round(len(rotulos) / 8))
+    ultimo = len(rotulos) - 1
+    mostrar = [i for i in range(len(rotulos)) if i % passo == 0 and ultimo - i >= max(1, passo // 2 + 1)]
+    mostrar.append(ultimo)
     return "".join(
-        f'<text class="g-rotulo" x="{x:.1f}" y="{y}" text-anchor="middle">{escape(r)}</text>'
-        for i, (r, x) in enumerate(zip(rotulos, posicoes)) if i % passo == 0 or i == len(rotulos) - 1
+        f'<text class="g-rotulo" x="{posicoes[i]:.1f}" y="{y}" text-anchor="middle">{escape(rotulos[i])}</text>'
+        for i in sorted(set(mostrar))
     )
 
 
@@ -60,11 +64,10 @@ def faixa_dias(rotulos, estados, rotulo=""):
     if not estados:
         return ""
     passo = max(1, round(len(rotulos) / 8))
+    ultimo = len(rotulos) - 1
+    mostrar = {i for i in range(len(rotulos)) if i % passo == 0 and ultimo - i >= max(1, passo // 2 + 1)} | {ultimo}
     barras_html = "".join(f'<span class="s-{e}" title="{escape(r)}"></span>' for r, e in zip(rotulos, estados))
-    rotulos_html = "".join(
-        f'<span>{escape(r) if i % passo == 0 or i == len(rotulos) - 1 else ""}</span>'
-        for i, r in enumerate(rotulos)
-    )
+    rotulos_html = "".join(f'<span>{escape(r) if i in mostrar else ""}</span>' for i, r in enumerate(rotulos))
     return (f'<div class="faixa" role="img" aria-label="{escape(rotulo)}">'
             f'<div class="faixa-barras">{barras_html}</div><div class="faixa-rotulos">{rotulos_html}</div></div>')
 
@@ -129,5 +132,29 @@ def linha(rotulos, valores, sufixo=" ms", rotulo=""):
         pontos = " ".join(f"{x:.1f},{y:.1f}" for x, y in t)
         partes.append(f'<polyline class="g-linha" points="{pontos}"/>')
         partes.extend(f'<circle class="g-ponto" cx="{x:.1f}" cy="{y:.1f}" r="2.5"/>' for x, y in t)
+    partes.append(_rotulos_x(rotulos, centros, ALTURA - 8))
+    return _svg("".join(partes), rotulo=rotulo)
+
+
+def barras_duplas(rotulos, valores_a, valores_b, sufixo=" GB", rotulo=""):
+    """Duas barras por dia, lado a lado (ex.: download em azul e upload em roxo, como no UniFi)."""
+    if not valores_a:
+        return ""
+    todos = [v for v in list(valores_a) + list(valores_b) if v is not None]
+    maximo = _teto(max(todos + [0.01]) * 1.1)
+    altura_util = ALTURA - MARGEM_TOPO - MARGEM_BASE
+    passo = (LARGURA - MARGEM_ESQ - MARGEM_DIR) / len(valores_a)
+    largura = max(1.5, passo * 0.32)
+    base = MARGEM_TOPO + altura_util
+
+    partes, centros = [_eixos(maximo, sufixo)], []
+    for i, (a, b) in enumerate(zip(valores_a, valores_b)):
+        centro = MARGEM_ESQ + passo * (i + 0.5)
+        centros.append(centro)
+        for valor, classe, x in ((a, "g-down", centro - largura - 0.5), (b, "g-up", centro + 0.5)):
+            if valor:
+                h = altura_util * valor / maximo
+                partes.append(f'<rect class="{classe}" x="{x:.1f}" y="{base - h:.1f}" width="{largura:.1f}" '
+                              f'height="{h:.1f}" rx="1"/>')
     partes.append(_rotulos_x(rotulos, centros, ALTURA - 8))
     return _svg("".join(partes), rotulo=rotulo)

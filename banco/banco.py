@@ -120,6 +120,81 @@ CREATE TABLE IF NOT EXISTS radio_config (
     PRIMARY KEY (device_id, coletado_em, posicao)
 );
 
+-- Clientes conectados, foto a cada coleta (API interna v2). site = nome interno (ex.: default).
+CREATE TABLE IF NOT EXISTS cliente_amostra (
+    host_id           TEXT NOT NULL,
+    site              TEXT NOT NULL,
+    coletado_em       TEXT NOT NULL,
+    mac               TEXT NOT NULL,
+    nome              TEXT,
+    tipo              TEXT,      -- WIRELESS ou WIRED
+    fabricante        TEXT,      -- pelo prefixo do MAC (ex.: Microsoft Corporation)
+    modelo            TEXT,      -- identificação do UniFi (ex.: Windows PC, Generic Laptop)
+    so_id             INTEGER,   -- código do sistema operacional (traduzido pelo catálogo)
+    rede              TEXT,
+    ssid              TEXT,
+    sinal_dbm         INTEGER,
+    experiencia       INTEGER,   -- nota de experiência Wi-Fi do UniFi (0 a 100)
+    retransmissao_pct REAL,
+    porta             INTEGER,
+    velocidade_mbps   INTEGER,
+    conectado_seg     INTEGER,
+    PRIMARY KEY (host_id, mac, coletado_em)
+);
+
+-- Consumo da internet do site por dia (relatório diário do próprio console).
+CREATE TABLE IF NOT EXISTS internet_dia (
+    host_id        TEXT NOT NULL,
+    site           TEXT NOT NULL,
+    dia            TEXT NOT NULL,  -- AAAA-MM-DD no horário de Brasília
+    download_bytes INTEGER,
+    upload_bytes   INTEGER,
+    clientes       INTEGER,
+    coletado_em    TEXT NOT NULL,
+    PRIMARY KEY (host_id, site, dia)
+);
+
+-- Tráfego de cada cliente por dia (rede local + internet).
+CREATE TABLE IF NOT EXISTS cliente_dia (
+    host_id        TEXT NOT NULL,
+    site           TEXT NOT NULL,
+    mac            TEXT NOT NULL,
+    dia            TEXT NOT NULL,
+    download_bytes INTEGER,
+    upload_bytes   INTEGER,
+    coletado_em    TEXT NOT NULL,
+    PRIMARY KEY (host_id, site, mac, dia)
+);
+
+-- Tráfego por aplicativo, só no total do site (sem detalhe por pessoa, por LGPD).
+CREATE TABLE IF NOT EXISTS aplicativo_dia (
+    host_id        TEXT NOT NULL,
+    site           TEXT NOT NULL,
+    dia            TEXT NOT NULL,
+    categoria_id   INTEGER NOT NULL,
+    aplicativo_id  INTEGER NOT NULL,
+    download_bytes INTEGER,
+    upload_bytes   INTEGER,
+    dispositivos   INTEGER,
+    coletado_em    TEXT NOT NULL,
+    PRIMARY KEY (host_id, site, dia, categoria_id, aplicativo_id)
+);
+
+-- Tabelas de tradução: categorias e aplicativos de DPI, sistemas, fabricantes etc.
+CREATE TABLE IF NOT EXISTS catalogo (
+    tipo          TEXT NOT NULL,  -- dpi_categoria, dpi_aplicativo, so, fabricante, familia, tipo_dispositivo
+    id            INTEGER NOT NULL,
+    nome          TEXT,
+    atualizado_em TEXT,
+    PRIMARY KEY (tipo, id)
+);
+
+-- Quando cada coleta "de tempos em tempos" rodou pela última vez.
+CREATE TABLE IF NOT EXISTS controle_coleta (
+    chave  TEXT PRIMARY KEY,
+    ultima TEXT NOT NULL
+);
+
 -- Quantidade de clientes conectados em cada site, a cada coleta.
 CREATE TABLE IF NOT EXISTS clientes_amostra (
     host_id     TEXT NOT NULL,

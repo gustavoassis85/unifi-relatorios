@@ -40,10 +40,19 @@ Connector (API Network de cada console, via nuvem):
 - Paginação: offset, limit (padrão 25), count, totalCount.
 - Limites: 100 req/min por console (erro 429 com Retry-After), timeout de 25 s, resposta até 10 MB.
 - IDs: o siteId da Site Manager (hex) é diferente do siteId da Network (UUID). Ligação pelo hostId.
-- Dados por cliente (sistema operacional, fabricante, sinal, SSID, consumo de download/upload): não existem na API oficial, nem na v11.0.97. Só existem nas APIs internas do Network (/network/api/s/default/stat/sta e /network/v2/api/site/default/clients/active). Em teste se a chave da nuvem acessa essas rotas pelo connector.
+- Dados por cliente e consumo: não existem na API oficial (nem na v11.0.97). Vêm das APIs internas do Network, que a chave da nuvem acessa pelo connector (validado em 15/11/2026):
+  - GET {connector}/network/v2/api/site/{site}/clients/active → nome, type (WIRELESS/WIRED), oui (fabricante), model_name (tipo), fingerprint.os_name (código do SO), essid, signal, wifi_experience_score, wifi_tx_retries_percentage, sw_port, wired_rate_mbps, tx_bytes/rx_bytes desde a conexão.
+  - GET {connector}/network/v2/api/site/{site}/traffic?start=ms&end=ms&includeUnidentified=true → total_usage_by_app (application, category, bytes_received = download, bytes_transmitted = upload, client_count) e client_usage_by_app (não usamos: LGPD). application 65535 / category 255 = não identificado.
+  - GET {connector}/network/v2/api/fingerprint_devices/0 → os_name_ids, vendor_ids, family_ids, dev_type_ids (tradução).
+  - POST {connector}/network/api/s/{site}/stat/report/daily.site e daily.user (consulta de leitura) → wan-rx_bytes = download e wan-tx_bytes = upload do site por dia; por cliente, tx_bytes = download e rx_bytes = upload (validado com a tela do UniFi).
+  - O antigo stat/sitedpi volta vazio (aposentado).
+  - Catálogo de DPI pela API oficial: /network/integration/v1/dpi/categories (35) e /dpi/applications (2.112), em inglês.
+  - Tráfego por cliente inclui rede local + internet; consumo de internet de verdade só no total do site.
+  - São rotas não documentadas: podem mudar numa atualização. O relatório tem que sair mesmo se elas falharem.
 
 ## Regras obrigatórias do código
-- Só requisições GET, com lista fixa de caminhos permitidos. Pelo connector, só /network/integration/v1/.
+- Só leitura. GET apenas nos caminhos de coletor/api.py (GET_PERMITIDOS). POST apenas nos relatórios daily.site e daily.user (POST_PERMITIDOS), que são consultas.
+- LGPD: aplicativos só no total da rede; não coletamos nem mostramos uso de aplicativo por pessoa/dispositivo.
 - Connector: no máximo ~85 chamadas/min por console (classe Ritmo em coletor/equipamentos.py).
 - Detalhe de portas/rádios em toda coleta: uma foto só engana (PC em repouso negocia 10/100 Mbps). Regra de "porta abaixo da capacidade" só vira achado se persistir em várias amostras.
 - Chave da API no arquivo .env. Nunca no código, nunca no Git. .env listado no .gitignore.
@@ -59,6 +68,7 @@ Connector (API Network de cada console, via nuvem):
 3. Coletor de consoles (hosts).  (feito)
 4. Coletor de equipamentos (connector) com controle de ritmo.  (feito)
    4b. Agendamento: coletar.py de hora em hora pelo Agendador de Tarefas do Windows (log em dados/coleta.log).  (feito)
+   4c. Clientes (de hora em hora), consumo diário e aplicativos (a cada 6h, 30 dias na primeira vez) e catálogos (1x por semana): coletor/clientes.py, coletor/consumo.py, coletor/catalogos.py. Controle de frequência na tabela controle_coleta.  (feito)
 5. Motor de achados (regras com severidade, evidência e recomendação).  (feito)
    achados/regras.py: limites ajustáveis em LIMITES; cada achado tem área, severidade (alta, média, baixa, informativo), evidência e recomendação.
 6. Relatório PDF do lab.  ← em andamento

@@ -172,7 +172,7 @@ def _bloco_site(console):
     )
 
 
-def _bloco_trilho(achados, equipamentos, clientes):
+def _bloco_trilho(achados, equipamentos, clientes, detalhe):
     contagem = "".join(
         f'<li>{_ponto(SEVERIDADE[s][1])}<span>{SEVERIDADE[s][0]}</span>'
         f'<span class="qtd">{sum(1 for a in achados if a.severidade == s)}</span></li>'
@@ -181,7 +181,9 @@ def _bloco_trilho(achados, equipamentos, clientes):
     rede = []
     if equipamentos:
         online = sum(1 for e in equipamentos if e["estado"] == "ONLINE")
-        rede.append(("Dispositivos online", f"{online} de {len(equipamentos)}"))
+        rede.append(("Equipamentos online", f"{online} de {len(equipamentos)}"))
+    if detalhe:
+        rede.append(("Clientes no período", str(detalhe["quantidade"])))
     if clientes:
         rede += [("Média de clientes", _num(clientes["media"], 0)),
                  ("Pico de clientes", str(clientes["pico"])),
@@ -288,7 +290,7 @@ def _bloco_dispositivos(equipamentos, clientes):
     if clientes:
         rodape = (f'<div class="rodape-painel">Clientes conectados: {_num(clientes["media"], 0)} em média, '
                   f'pico de {clientes["pico"]} ({clientes["pico_cabo"]} cabo, {clientes["pico_wifi"]} Wi-Fi).</div>')
-    return ('<section class="painel"><div class="painel-topo"><h2>Dispositivos</h2>'
+    return ('<section class="painel"><div class="painel-topo"><h2>Equipamentos UniFi</h2>'
             '<span class="meta">CPU e memória: médias do período</span></div>'
             '<table class="tabela tabela-compacta"><thead><tr>'
             '<th>Nome</th><th>Modelo</th><th>Status</th><th>Versão</th><th class="num">Online</th>'
@@ -296,18 +298,237 @@ def _bloco_dispositivos(equipamentos, clientes):
             f'</tr></thead><tbody>{linhas}</tbody></table>{rodape}</section>')
 
 
+# ---------------------------------------------------------------- consumo, aplicativos e clientes
+
+NAO_IDENTIFICADO_APP = 65535
+NAO_IDENTIFICADO_CAT = 255
+
+# O catálogo do UniFi vem em inglês; as categorias mais comuns ganham nome em português.
+CATEGORIAS_PT = {
+    "instant messengers": "Mensageiros", "peer-to-peer networks": "Redes P2P",
+    "file sharing services and tools": "Compartilhamento de arquivos",
+    "media streaming services": "Streaming de vídeo e áudio", "email messaging services": "E-mail",
+    "voip services": "Chamadas de voz (VoIP)", "database systems": "Bancos de dados",
+    "online games": "Jogos online", "network management tools and protocols": "Gerenciamento de rede",
+    "remote access terminals": "Acesso remoto", "bypass proxies and tunnels": "Proxies e túneis",
+    "stock market": "Bolsa de valores", "web services": "Serviços web", "security updates": "Atualizações de segurança",
+    "software updates": "Atualizações de software", "web instant messengers": "Mensageiros web",
+    "business systems": "Sistemas corporativos", "network protocols": "Protocolos de rede",
+    "private protocols": "Protocolos privados", "social networks": "Redes sociais",
+    "video conferencing": "Videoconferência", "cloud storage": "Armazenamento em nuvem",
+    "advertising": "Publicidade", "e-commerce": "Compras online", "news": "Notícias",
+}
+
+
+def _bytes(valor):
+    valor = valor or 0
+    if valor >= 1e9:
+        return f"{_num(valor / 1e9)} GB"
+    if valor >= 1e6:
+        return f"{_num(valor / 1e6, 0)} MB"
+    return f"{_num(valor / 1e3, 0)} KB"
+
+
+def _catalogo(conexao, tipo):
+    return {l["id"]: l["nome"] for l in conexao.execute("SELECT id, nome FROM catalogo WHERE tipo = ?", (tipo,))}
+
+
+def _dias(inicio, fim):
+    return inicio.astimezone(FUSO).date().isoformat(), fim.astimezone(FUSO).date().isoformat()
+
+
+def _dados_consumo(conexao, host_id, inicio, fim):
+    linhas = conexao.execute(
+        "SELECT dia, SUM(download_bytes) AS d, SUM(upload_bytes) AS u FROM internet_dia "
+        "WHERE host_id = ? AND dia BETWEEN ? AND ? GROUP BY dia ORDER BY dia", (host_id, *_dias(inicio, fim))
+    ).fetchall()
+    if not linhas:
+        return None
+    maior = max(linhas, key=lambda l: l["d"] or 0)
+    return {
+        "dias": [(l["dia"][8:10] + "/" + l["dia"][5:7], (l["d"] or 0) / 1e9, (l["u"] or 0) / 1e9) for l in linhas],
+        "download": sum(l["d"] or 0 for l in linhas),
+        "upload": sum(l["u"] or 0 for l in linhas),
+        "media": sum(l["d"] or 0 for l in linhas) / len(linhas),
+        "maior_dia": maior["dia"][8:10] + "/" + maior["dia"][5:7], "maior_valor": maior["d"] or 0,
+    }
+
+
+def _dados_aplicativos(conexao, host_id, inicio, fim):
+    linhas = conexao.execute(
+        "SELECT categoria_id AS cat, aplicativo_id AS app, SUM(download_bytes) AS d, SUM(upload_bytes) AS u, "
+        "MAX(dispositivos) AS disp FROM aplicativo_dia WHERE host_id = ? AND dia BETWEEN ? AND ? "
+        "GROUP BY categoria_id, aplicativo_id", (host_id, *_dias(inicio, fim))
+    ).fetchall()
+    total = sum((l["d"] or 0) + (l["u"] or 0) for l in linhas)
+    if not total:
+        return None
+    nomes_app, nomes_cat = _catalogo(conexao, "dpi_aplicativo"), _catalogo(conexao, "dpi_categoria")
+
+    def nome_app(cat, app):
+        if app == NAO_IDENTIFICADO_APP or cat == NAO_IDENTIFICADO_CAT:
+            return "Não identificado"
+        return nomes_app.get((cat << 16) | app) or nomes_app.get(app) or f"Aplicativo {app}"
+
+    def nome_cat(cat):
+        if cat == NAO_IDENTIFICADO_CAT:
+            return "Não identificado"
+        nome = nomes_cat.get(cat)
+        return CATEGORIAS_PT.get((nome or "").lower(), nome) or f"Categoria {cat}"
+
+    apps = sorted(linhas, key=lambda l: -((l["d"] or 0) + (l["u"] or 0)))
+    por_categoria = defaultdict(int)
+    for l in linhas:
+        por_categoria[l["cat"]] += (l["d"] or 0) + (l["u"] or 0)
+    categorias = sorted(por_categoria.items(), key=lambda item: -item[1])
+    principais = [(nome_cat(c), v, 100 * v / total) for c, v in categorias[:6]]
+    resto = sum(v for _, v in categorias[6:])
+    if resto:
+        principais.append(("Outras categorias", resto, 100 * resto / total))
+    return {
+        "total": total,
+        "categorias": principais,
+        "apps": [{"nome": nome_app(l["cat"], l["app"]), "categoria": nome_cat(l["cat"]),
+                  "download": l["d"] or 0, "upload": l["u"] or 0, "dispositivos": l["disp"],
+                  "pct": 100 * ((l["d"] or 0) + (l["u"] or 0)) / total} for l in apps[:10]],
+    }
+
+
+def _dados_clientes_detalhe(conexao, host_id, inicio, fim):
+    ultimos = {}
+    for c in _periodo_sql(conexao, "SELECT * FROM cliente_amostra WHERE host_id = ?", inicio, fim, (host_id,)):
+        ultimos[c["mac"]] = c  # fica a foto mais recente de cada cliente
+    trafego = conexao.execute(
+        "SELECT mac, SUM(download_bytes) AS d, SUM(upload_bytes) AS u FROM cliente_dia "
+        "WHERE host_id = ? AND dia BETWEEN ? AND ? GROUP BY mac", (host_id, *_dias(inicio, fim))
+    ).fetchall()
+    if not ultimos and not trafego:
+        return None
+    sistemas = _catalogo(conexao, "so")
+
+    def contar(chave):
+        contagem = defaultdict(int)
+        for c in ultimos.values():
+            contagem[chave(c) or "Não identificado"] += 1
+        return sorted(contagem.items(), key=lambda item: (-item[1], item[0]))[:5]
+
+    def conexao_txt(c):
+        if not c:
+            return "-"
+        if c["tipo"] == "WIRELESS":
+            sinal = f", {c['sinal_dbm']} dBm" if c["sinal_dbm"] is not None else ""
+            return f"Wi-Fi {c['ssid'] or ''}{sinal}".replace("Wi-Fi ,", "Wi-Fi,")
+        porta = f", porta {c['porta']}" if c["porta"] else ""
+        velocidade = f", {c['velocidade_mbps']} Mbps" if c["velocidade_mbps"] else ""
+        return f"Cabo{porta}{velocidade}"
+
+    topo = sorted(trafego, key=lambda t: -((t["d"] or 0) + (t["u"] or 0)))[:10]
+    macs = set(ultimos) | {t["mac"] for t in trafego}
+    return {
+        "quantidade": len(macs),
+        "conexao": contar(lambda c: "Wi-Fi" if c["tipo"] == "WIRELESS" else "Cabo"),
+        "fabricantes": contar(lambda c: c["fabricante"]),
+        "tipos": contar(lambda c: c["modelo"]),
+        "sistemas": contar(lambda c: sistemas.get(c["so_id"])),
+        "topo": [{
+            "nome": (ultimos[t["mac"]]["nome"] or t["mac"]) if t["mac"] in ultimos else t["mac"],
+            "tipo": ultimos[t["mac"]]["modelo"] if t["mac"] in ultimos else "-",
+            "fabricante": ultimos[t["mac"]]["fabricante"] if t["mac"] in ultimos else "-",
+            "conexao": conexao_txt(ultimos.get(t["mac"])),
+            "download": t["d"] or 0, "upload": t["u"] or 0,
+        } for t in topo],
+    }
+
+
+def _bloco_consumo(consumo):
+    if not consumo:
+        return ""
+    kpis = "".join([
+        _kpi("Download no período", _bytes(consumo["download"])),
+        _kpi("Upload no período", _bytes(consumo["upload"])),
+        _kpi("Média diária de download", _bytes(consumo["media"])),
+        _kpi("Dia de maior consumo", consumo["maior_dia"], _bytes(consumo["maior_valor"]) + " de download"),
+    ])
+    rotulos = [d[0] for d in consumo["dias"]]
+    return (
+        '<section class="painel"><div class="painel-topo"><h2>Consumo da internet</h2>'
+        '<span class="meta">total do site por dia</span></div>'
+        f'<div class="kpis kpis-4">{kpis}</div>'
+        + graficos.barras_duplas(rotulos, [d[1] for d in consumo["dias"]], [d[2] for d in consumo["dias"]],
+                                 rotulo="Download e upload por dia")
+        + f'<div class="legenda">{_ponto("down")}<span>Download</span>{_ponto("up")}<span>Upload</span></div>'
+        '<div class="espaco"></div></section>'
+    )
+
+
+def _bloco_aplicativos(aplicativos):
+    if not aplicativos:
+        return ""
+    categorias = "".join(
+        f'<li><span class="cat-nome">{escape(nome)}</span><span class="cat-barra"><i style="width:{pct:.1f}%"></i></span>'
+        f'<span class="cat-valor">{_num(pct, 0)}%</span></li>'
+        for nome, _valor, pct in aplicativos["categorias"]
+    )
+    linhas = "".join(
+        f'<tr><td class="nome">{escape(a["nome"])}</td><td class="area">{escape(a["categoria"])}</td>'
+        f'<td class="num">{_bytes(a["download"])}</td><td class="num">{_bytes(a["upload"])}</td>'
+        f'<td class="num">{a["dispositivos"] if a["dispositivos"] is not None else "-"}</td>'
+        f'<td class="num">{_num(a["pct"])}%</td></tr>'
+        for a in aplicativos["apps"]
+    )
+    return (
+        '<section class="painel painel-quebra"><div class="painel-topo"><h2>Aplicativos na rede</h2>'
+        '<span class="meta">total da rede, sem detalhe por pessoa</span></div>'
+        f'<ul class="cat-lista">{categorias}</ul>'
+        '<table class="tabela tabela-compacta"><thead><tr><th>Aplicativo</th><th>Categoria</th>'
+        '<th class="num">Download</th><th class="num">Upload</th><th class="num">Dispositivos</th>'
+        f'<th class="num">Participação</th></tr></thead><tbody>{linhas}</tbody></table></section>'
+    )
+
+
+def _bloco_clientes(clientes):
+    if not clientes:
+        return ""
+
+    def mini(titulo, itens):
+        if not itens:
+            return ""
+        linhas = "".join(f'<li><span>{escape(str(nome))}</span><span class="qtd">{qtd}</span></li>' for nome, qtd in itens)
+        return f'<div class="mini"><h3>{titulo}</h3><ul class="contagem">{linhas}</ul></div>'
+
+    resumo = "".join([mini("Conexão", clientes["conexao"]), mini("Tipos de dispositivo", clientes["tipos"]),
+                      mini("Fabricantes", clientes["fabricantes"])])
+    linhas = "".join(
+        f'<tr><td class="nome">{escape(t["nome"] or "-")}</td><td>{escape(t["tipo"] or "-")}</td>'
+        f'<td>{escape(t["fabricante"] or "-")}</td><td>{escape(t["conexao"])}</td>'
+        f'<td class="num">{_bytes(t["download"])}</td><td class="num">{_bytes(t["upload"])}</td></tr>'
+        for t in clientes["topo"]
+    )
+    tabela = ""
+    if linhas:
+        tabela = ('<table class="tabela tabela-compacta"><thead><tr><th>Cliente</th><th>Tipo</th><th>Fabricante</th>'
+                  '<th>Conexão</th><th class="num">Download</th><th class="num">Upload</th></tr></thead>'
+                  f'<tbody>{linhas}</tbody></table><div class="rodape-painel">Tráfego de cada dispositivo na rede '
+                  '(rede local e internet), segundo os relatórios do próprio console.</div>')
+    return (
+        '<section class="painel painel-quebra"><div class="painel-topo"><h2>Clientes</h2>'
+        f'<span class="meta">{clientes["quantidade"]} dispositivos no período</span></div>'
+        f'<div class="grade-3">{resumo}</div>{tabela}</section>'
+    )
+
+
 CSS = """
 :root, .tema-escuro {
   --canvas: #131416; --painel: #1b1d20; --painel-2: #212327; --borda: #2c2f34;
   --texto: #e8e9eb; --texto-2: #a3a8ae; --texto-3: #6f747b;
   --acento: #4797ff; --ok: #3fcb76; --atencao: #f0b43c; --critico: #f2555a;
-  --neutro: #5d636b; --parcial: #3b3f45; --vazio: #26292d; --grade: #2a2d32;
+  --neutro: #5d636b; --parcial: #3b3f45; --vazio: #26292d; --grade: #2a2d32; --upload: #a77bff;
 }
 .tema-claro {
   --canvas: #f3f4f6; --painel: #ffffff; --painel-2: #f8f9fa; --borda: #e2e5e9;
   --texto: #1c1f23; --texto-2: #5b6168; --texto-3: #8b9097;
   --acento: #006fff; --ok: #1f9d55; --atencao: #c98a0b; --critico: #d93a3f;
-  --neutro: #a1a7ae; --parcial: #d3d7dc; --vazio: #eceef1; --grade: #eceef1;
+  --neutro: #a1a7ae; --parcial: #d3d7dc; --vazio: #eceef1; --grade: #eceef1; --upload: #7a4fe0;
 }
 @page { size: A4; margin: 0; }
 * { box-sizing: border-box; }
@@ -365,6 +586,7 @@ h2 { font-size: 16px; }
   vertical-align: 1px; background: var(--neutro); }
 .ponto.ok { background: var(--ok); } .ponto.atencao { background: var(--atencao); }
 .ponto.critico { background: var(--critico); } .ponto.parcial { background: var(--parcial); }
+.ponto.down { background: var(--acento); } .ponto.up { background: var(--upload); }
 
 .situacao { display: flex; align-items: baseline; font-size: 16px; margin: 0 0 16px 4px; }
 
@@ -377,7 +599,7 @@ h2 { font-size: 16px; }
 .contagem li { display: flex; align-items: baseline; padding: 6px 0; }
 .contagem .qtd { margin-left: auto; padding-left: 8px; color: var(--texto-2); white-space: nowrap; }
 
-.legenda { display: flex; gap: 16px; flex-wrap: wrap; font-size: 12px; color: var(--texto-2); margin-top: 12px; }
+.legenda { display: flex; gap: 16px; flex-wrap: wrap; align-items: baseline; font-size: 12px; color: var(--texto-2); margin-top: 12px; }
 .kpis { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; margin-top: 16px; margin-bottom: 16px; }
 .visao > .painel-link { display: flex; flex-direction: column; }
 .visao > .painel-link > .kpis { margin-top: auto; padding-top: 16px; }
@@ -396,6 +618,18 @@ h2 { font-size: 16px; }
 .g-limite { stroke: var(--critico); stroke-width: 1; stroke-dasharray: 4 3; opacity: .8; }
 .g-linha { fill: none; stroke: var(--acento); stroke-width: 2; }
 .g-ponto { fill: var(--acento); }
+.g-down { fill: var(--acento); } .g-up { fill: var(--upload); }
+.kpis-4 { grid-template-columns: repeat(4, 1fr); margin-left: 16px; margin-right: 16px; }
+.espaco { height: 16px; }
+.legenda span + .ponto { margin-left: 8px; }
+.cat-lista { list-style: none; margin: 16px; padding: 0; }
+.cat-lista li { display: grid; grid-template-columns: 200px 1fr 48px; align-items: center; gap: 12px; padding: 4px 0; }
+.cat-barra { height: 8px; background: var(--vazio); border-radius: 4px; overflow: hidden; }
+.cat-barra i { display: block; height: 100%; background: var(--acento); border-radius: 4px; }
+.cat-valor { text-align: right; color: var(--texto-2); }
+.grade-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 24px; padding: 16px; border-bottom: 1px solid var(--borda); }
+.mini h3 { font-size: 12px; font-weight: 500; color: var(--texto-2); margin: 0 0 4px; line-height: 1.4; }
+.mini .contagem li { padding: 4px 0; }
 .faixa { margin: 16px 16px 0; }
 .faixa-barras { display: flex; gap: 3px; height: 56px; }
 .faixa-barras span { flex: 1; border-radius: 2px; background: var(--vazio); }
@@ -411,7 +645,9 @@ footer { margin: 8px 4px 0; max-width: 75ch; }
 @media print { .pagina { max-width: none; padding: 10mm 10mm 12mm; } }
 @media (max-width: 720px) {
   .visao { grid-template-columns: 1fr; }
-  .kpis { grid-template-columns: repeat(2, 1fr); }
+  .kpis, .kpis-4 { grid-template-columns: repeat(2, 1fr); }
+  .grade-3 { grid-template-columns: 1fr; }
+  .cat-lista li { grid-template-columns: 120px 1fr 40px; }
   .barra { grid-template-columns: 1fr; } .barra-periodo { justify-self: start; }
   .tabela { display: block; overflow-x: auto; }
 }
@@ -425,6 +661,9 @@ def gerar_html(conexao, console, inicio, fim, marca):
     link = _dados_link(conexao, host_id, inicio, fim)
     equipamentos = _dados_equipamentos(conexao, host_id, inicio, fim)
     clientes = _dados_clientes(conexao, host_id, inicio, fim)
+    detalhe = _dados_clientes_detalhe(conexao, host_id, inicio, fim)
+    consumo = _dados_consumo(conexao, host_id, inicio, fim)
+    aplicativos = _dados_aplicativos(conexao, host_id, inicio, fim)
     periodo = f"{inicio.astimezone(FUSO):%d/%m/%Y} a {fim.astimezone(FUSO):%d/%m/%Y}"
     tema = "tema-claro" if marca.get("tema") == "claro" else "tema-escuro"
     classe_situacao, texto_situacao = _situacao(achados)
@@ -441,10 +680,13 @@ def gerar_html(conexao, console, inicio, fim, marca):
 <div class="barra-periodo">{periodo}</div></header>
 {_bloco_site(console)}
 <p class="situacao">{_ponto(classe_situacao)}{texto_situacao}</p>
-<div class="visao">{_bloco_trilho(achados, equipamentos, clientes)}{_bloco_link(link)}</div>
+<div class="visao">{_bloco_trilho(achados, equipamentos, clientes, detalhe)}{_bloco_link(link)}</div>
 {_bloco_achados(achados)}
 {_bloco_passos(achados)}
 {_bloco_graficos(link)}
+{_bloco_consumo(consumo)}
+{_bloco_aplicativos(aplicativos)}
+{_bloco_clientes(detalhe)}
 {_bloco_dispositivos(equipamentos, clientes)}
 <footer>Relatório preparado por {escape(marca.get('empresa', ''))}.{contato} A disponibilidade do link
 é estimada pelas horas com dados registrados na nuvem da Ubiquiti.</footer>

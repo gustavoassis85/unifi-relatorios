@@ -15,7 +15,7 @@ import time
 from datetime import datetime, timezone
 
 from banco.banco import conectar
-from coletor.api import ErroApi, get
+from coletor.api import ErroApi, consultar_relatorio, get
 
 INTERVALO_ENTRE_CHAMADAS = 0.7  # segundos entre chamadas ao mesmo console (~85 por minuto)
 TAMANHO_PAGINA = 100
@@ -36,15 +36,22 @@ class Ritmo:
         self.ultima = 0.0
         self.chamadas = 0
 
-    def get(self, caminho, parametros=None):
+    def _chamar(self, funcao, *args):
         espera = self.ultima + self.intervalo - time.monotonic()
         if espera > 0:
             time.sleep(espera)
         try:
             self.chamadas += 1
-            return get(caminho, parametros)
+            return funcao(*args)
         finally:
             self.ultima = time.monotonic()
+
+    def get(self, caminho, parametros=None):
+        return self._chamar(get, caminho, parametros)
+
+    def consultar(self, caminho, corpo):
+        """Consulta de leitura por POST (só os relatórios de consumo permitidos em coletor/api.py)."""
+        return self._chamar(consultar_relatorio, caminho, corpo)
 
 
 def _todos(ritmo, caminho):

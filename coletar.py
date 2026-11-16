@@ -6,7 +6,7 @@ Cada execução também fica registrada em dados/coleta.log (útil quando roda p
 from datetime import datetime
 from pathlib import Path
 
-from coletor import consoles, equipamentos, wan
+from coletor import catalogos, clientes, consoles, consumo, equipamentos, wan
 from coletor.api import ErroApi
 
 ARQUIVO_LOG = Path(__file__).resolve().parent / "dados" / "coleta.log"
@@ -17,6 +17,9 @@ COLETAS = [
     ("Consoles (situação, versões, backup)", consoles.coletar),
     ("WAN (métricas do link)", wan.coletar),
     ("Equipamentos (saúde, portas, Wi-Fi, clientes)", equipamentos.coletar),
+    ("Clientes conectados (fabricante, sistema, Wi-Fi)", clientes.coletar),
+    ("Consumo (internet, clientes e aplicativos por dia)", consumo.coletar),
+    ("Catálogos (nomes de aplicativos e sistemas)", catalogos.coletar),
 ]
 
 

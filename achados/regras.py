@@ -42,6 +42,13 @@ LIMITES = {
     "porta_fracao_abaixo": 0.8,         # fração das amostras com a porta abaixo da capacidade
     "retransmissao_min_amostras": 6,
     "retransmissao_pct": 10.0,          # média do período por rádio
+    # Clientes
+    "wifi_min_amostras": 6,
+    "sinal_fraco_dbm": -72,             # sinal médio igual ou pior que isso = fraco
+    "sinal_muito_fraco_dbm": -80,
+    "experiencia_minima": 70,           # nota média de experiência Wi-Fi do UniFi (0 a 100)
+    "upload_dispositivo_bytes": 1e9,    # dispositivo que enviou pelo menos isso no período
+    "upload_dispositivo_fracao": 0.5,   # e responde por pelo menos essa fração do upload do site
 }
 
 ORDEM_SEVERIDADE = {"alta": 0, "media": 1, "baixa": 2, "info": 3}
@@ -87,9 +94,17 @@ def _qtd(n, singular, plural):
     return f"{n} {singular if n == 1 else plural}"
 
 
+def _bytes(valor):
+    valor = valor or 0
+    if valor >= 1e9:
+        return f"{_num(valor / 1e9)} GB"
+    return f"{_num(valor / 1e6, 0)} MB"
+
+
 def _no_periodo(conexao, sql, inicio, fim, coluna="coletado_em"):
     """Executa um SELECT filtrando a coluna de data pelo período."""
-    filtro = f" WHERE substr({coluna}, 1, 19) >= ? AND substr({coluna}, 1, 19) <= ?"
+    ligacao = " AND " if " where " in sql.lower() else " WHERE "
+    filtro = f"{ligacao}substr({coluna}, 1, 19) >= ? AND substr({coluna}, 1, 19) <= ?"
     return conexao.execute(sql + filtro + f" ORDER BY {coluna}", (_chave(inicio), _chave(fim))).fetchall()
 
 
@@ -478,12 +493,102 @@ def regra_radios(conexao, inicio, fim):
     return achados
 
 
+# ---------------------------------------------------------------- regras dos clientes
+
+def _nome_cliente(conexao, host_id, mac):
+    linha = conexao.execute(
+        "SELECT nome FROM cliente_amostra WHERE host_id = ? AND mac = ? AND nome IS NOT NULL "
+        "ORDER BY coletado_em DESC LIMIT 1", (host_id, mac)
+    ).fetchone()
+    return linha["nome"] if linha else mac
+
+
+def regra_wifi_clientes(conexao, inicio, fim):
+    """Clientes Wi-Fi com sinal fraco ou experiência ruim de forma persistente."""
+    achados = []
+    amostras = defaultdict(list)
+    for c in _no_periodo(conexao, "SELECT * FROM cliente_amostra WHERE tipo = 'WIRELESS'", inicio, fim):
+        amostras[(c["host_id"], c["mac"])].append(c)
+
+    fracos, ruins = defaultdict(list), defaultdict(list)
+    for (host_id, _mac), lista in amostras.items():
+        if len(lista) < LIMITES["wifi_min_amostras"]:
+            continue
+        nome, ssid = lista[-1]["nome"], lista[-1]["ssid"]
+        sinais = [c["sinal_dbm"] for c in lista if c["sinal_dbm"] is not None]
+        notas_exp = [c["experiencia"] for c in lista if c["experiencia"] is not None]
+        if sinais and mean(sinais) <= LIMITES["sinal_fraco_dbm"]:
+            fracos[host_id].append((mean(sinais), nome, ssid))
+        elif notas_exp and mean(notas_exp) < LIMITES["experiencia_minima"]:
+            ruins[host_id].append((mean(notas_exp), nome, ssid))
+
+    for host_id, lista in fracos.items():
+        lista.sort()
+        grave = lista[0][0] <= LIMITES["sinal_muito_fraco_dbm"] or len(lista) >= 3
+        itens = "; ".join(f"{nome} ({_num(sinal, 0)} dBm, rede {ssid})" for sinal, nome, ssid in lista[:5])
+        achados.append(Achado(
+            host_id, "Wi-Fi", "media" if grave else "baixa",
+            f"{_qtd(len(lista), 'dispositivo', 'dispositivos')} com sinal Wi-Fi fraco",
+            f"Sinal médio no período: {itens}. Sinal fraco causa lentidão e quedas.",
+            "Avaliar a cobertura no local desses dispositivos: reposicionar ou adicionar um ponto de "
+            "acesso. Dispositivos fixos podem ir para o cabo.",
+        ))
+    for host_id, lista in ruins.items():
+        lista.sort()
+        itens = "; ".join(f"{nome} (nota {_num(nota, 0)}, rede {ssid})" for nota, nome, ssid in lista[:5])
+        achados.append(Achado(
+            host_id, "Wi-Fi", "media",
+            f"{_qtd(len(lista), 'dispositivo', 'dispositivos')} com experiência Wi-Fi ruim",
+            f"Nota média de experiência do UniFi no período: {itens}.",
+            "Verificar interferência, canal e congestionamento do ponto de acesso desses dispositivos.",
+        ))
+    return achados
+
+
+def regra_upload_dispositivo(conexao, inicio, fim):
+    """Um dispositivo que responde pela maior parte do upload da rede."""
+    achados = []
+    dia_ini, dia_fim = inicio.astimezone(FUSO).date().isoformat(), fim.astimezone(FUSO).date().isoformat()
+    sites = conexao.execute(
+        "SELECT host_id, site, SUM(upload_bytes) AS upload FROM internet_dia "
+        "WHERE dia BETWEEN ? AND ? GROUP BY host_id, site", (dia_ini, dia_fim)
+    ).fetchall()
+    for s in sites:
+        if not s["upload"]:
+            continue
+        topo = conexao.execute(
+            "SELECT mac, SUM(upload_bytes) AS upload, SUM(download_bytes) AS download FROM cliente_dia "
+            "WHERE host_id = ? AND site = ? AND dia BETWEEN ? AND ? GROUP BY mac ORDER BY upload DESC LIMIT 1",
+            (s["host_id"], s["site"], dia_ini, dia_fim),
+        ).fetchone()
+        if not topo or not topo["upload"]:
+            continue
+        fracao = topo["upload"] / s["upload"]
+        if topo["upload"] < LIMITES["upload_dispositivo_bytes"] or fracao < LIMITES["upload_dispositivo_fracao"] \
+                or topo["upload"] <= (topo["download"] or 0):
+            continue
+        nome = _nome_cliente(conexao, s["host_id"], topo["mac"])
+        if fracao <= 1:
+            comparacao = f"o equivalente a {_num(100 * fracao, 0)}% de todo o upload da internet do site"
+        else:
+            comparacao = "mais que todo o upload da internet do site (parte é tráfego na rede local)"
+        achados.append(Achado(
+            s["host_id"], "Internet", "info", f"{nome} concentra o upload da rede",
+            f"{nome} enviou {_bytes(topo['upload'])} no período, {comparacao} "
+            f"({_bytes(s['upload'])}), e enviou mais do que recebeu.",
+            "Se for backup, sincronização ou câmera conhecida, desconsiderar. Caso contrário, verificar "
+            "o que esse dispositivo está enviando.",
+        ))
+    return achados
+
+
 # ---------------------------------------------------------------- execução
 
 REGRAS = [
     regra_wan_sem_dado, regra_wan_perda, regra_wan_latencia,
     regra_console_offline, regra_console_disponibilidade, regra_backup, regra_atualizacao_console,
     regra_equipamentos, regra_portas, regra_radios,
+    regra_wifi_clientes, regra_upload_dispositivo,
 ]
 
 
