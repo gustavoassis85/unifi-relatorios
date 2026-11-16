@@ -13,6 +13,13 @@ def vincular(usuario, organizacao, papel):
 
 
 @transaction.atomic
+def criar_usuario_na_organizacao(organizacao, email, nome, senha, papel):
+    usuario = get_user_model().objects.create_user(email, senha, nome=nome.strip())
+    vincular(usuario, organizacao, papel)
+    return usuario
+
+
+@transaction.atomic
 def criar_organizacao_com_admin(nome, admin_email, admin_nome, admin_senha):
     """Usado pelo dono da plataforma: cria a organização e o primeiro admin dela, juntos."""
     organizacao = Organizacao.objects.create(nome=nome.strip())

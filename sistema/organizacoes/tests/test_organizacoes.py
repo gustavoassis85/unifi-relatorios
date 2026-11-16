@@ -5,19 +5,21 @@ from django.contrib.auth import authenticate, get_user_model
 from django.core.exceptions import ValidationError
 from django.db import IntegrityError, transaction
 
+from apoio_testes import SENHA, ativar_mfa
 from organizacoes import papeis
 from organizacoes.models import Organizacao, Papel, Vinculo
 from organizacoes.servicos import criar_organizacao_com_admin, vincular
 
 pytestmark = pytest.mark.django_db
 
-SENHA = "senha-bem-longa-123"
 URL_ADMIN = "/" + settings.ADMIN_URL
 
 
 @pytest.fixture
 def dono_plataforma():
-    return get_user_model().objects.create_superuser("dono@plataforma.com", SENHA)
+    dono = get_user_model().objects.create_superuser("dono@plataforma.com", SENHA)
+    ativar_mfa(dono)
+    return dono
 
 
 def test_cria_organizacao_com_primeiro_admin():
@@ -125,10 +127,12 @@ def test_admin_recusa_senha_curta_e_nao_cria_nada(client, dono_plataforma):
 
 def test_admin_de_organizacao_nao_entra_no_admin_do_django(client):
     _, usuario = criar_organizacao_com_admin("MSP A", "a@a.com", "A", SENHA)
+    ativar_mfa(usuario)
     client.force_login(usuario)
-    resposta = client.get(URL_ADMIN)
-    assert resposta.status_code == 302
-    assert "login" in resposta["Location"]
+    resposta = client.get(URL_ADMIN, follow=True)
+    # Vai parar no início do sistema, nunca numa página do admin do Django.
+    assert resposta.redirect_chain[-1][0] == "/"
+    assert resposta.status_code == 200
 
 
 def test_admin_do_django_nao_apaga_organizacao(client, dono_plataforma):

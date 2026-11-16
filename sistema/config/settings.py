@@ -37,6 +37,9 @@ INSTALLED_APPS = [
     "django.contrib.sessions",
     "django.contrib.messages",
     "django.contrib.staticfiles",
+    "allauth",
+    "allauth.account",
+    "allauth.mfa",
     "contas",
     "organizacoes",
 ]
@@ -50,6 +53,9 @@ MIDDLEWARE = [
     "django.contrib.auth.middleware.AuthenticationMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
+    "allauth.account.middleware.AccountMiddleware",
+    # Quem precisa de MFA e ainda não configurou só acessa a tela de configurar.
+    "contas.middleware.MfaObrigatorioMiddleware",
 ]
 
 ROOT_URLCONF = "config.urls"
@@ -106,6 +112,48 @@ AUTH_PASSWORD_VALIDATORS = [
     {"NAME": "django.contrib.auth.password_validation.CommonPasswordValidator"},
     {"NAME": "django.contrib.auth.password_validation.NumericPasswordValidator"},
 ]
+
+# Login (django-allauth): e-mail e senha, sem cadastro aberto (usuários são criados
+# pelo admin da organização ou pelo dono da plataforma).
+AUTHENTICATION_BACKENDS = ["allauth.account.auth_backends.AuthenticationBackend"]
+ACCOUNT_ADAPTER = "contas.adaptadores.AdaptadorContas"
+ACCOUNT_LOGIN_METHODS = {"email"}
+ACCOUNT_SIGNUP_FIELDS = ["email*", "password1*", "password2*"]
+ACCOUNT_USER_MODEL_USERNAME_FIELD = None
+ACCOUNT_EMAIL_VERIFICATION = "none"
+ACCOUNT_SESSION_REMEMBER = False
+ACCOUNT_LOGOUT_ON_PASSWORD_CHANGE = True
+ACCOUNT_PREVENT_ENUMERATION = True
+# Bloqueio temporário: 5 senhas erradas para o mesmo e-mail travam por 15 minutos;
+# 10 tentativas por minuto do mesmo IP também travam.
+ACCOUNT_RATE_LIMITS = {"login_failed": "10/m/ip,5/900s/key"}
+LOGIN_URL = "account_login"
+LOGIN_REDIRECT_URL = "inicio"
+ACCOUNT_LOGOUT_REDIRECT_URL = "account_login"
+
+# MFA: app autenticador (TOTP) e códigos de recuperação.
+MFA_SUPPORTED_TYPES = ["totp", "recovery_codes"]
+MFA_TOTP_ISSUER = "Dashboard UniFi"
+MFA_PASSKEY_LOGIN_ENABLED = False
+MFA_TRUST_ENABLED = False
+
+# Cache compartilhado no banco: o bloqueio de login vale para todos os processos.
+CACHES = {
+    "default": {
+        "BACKEND": "django.core.cache.backends.db.DatabaseCache",
+        "LOCATION": "cache_sistema",
+    }
+}
+
+# Sessão: expira após 2 horas sem uso e ao fechar o navegador.
+SESSION_COOKIE_AGE = 2 * 60 * 60
+SESSION_SAVE_EVERY_REQUEST = True
+SESSION_EXPIRE_AT_BROWSER_CLOSE = True
+
+# E-mail: o SMTP chega numa etapa futura. Por enquanto, mensagens vão para o terminal.
+EMAIL_BACKEND = os.environ.get(
+    "DJANGO_EMAIL_BACKEND", "django.core.mail.backends.console.EmailBackend"
+)
 
 LANGUAGE_CODE = "pt-br"
 TIME_ZONE = "America/Sao_Paulo"
