@@ -11,7 +11,7 @@ from psycopg import sql
 SOMENTE_LEITURA = ["django_migrations"]
 
 # Tabelas só de acréscimo (auditoria): leitura e inclusão, sem alterar nem apagar.
-SO_ACRESCIMO = []
+SO_ACRESCIMO = ["auditoria_eventoorganizacao", "auditoria_eventoplataforma"]
 
 
 def tabelas_existentes():

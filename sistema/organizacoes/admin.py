@@ -8,6 +8,10 @@ from django.contrib import admin
 from django.contrib.auth import get_user_model
 from django.contrib.auth.password_validation import validate_password
 
+from auditoria.models import Acao
+from auditoria.registro import registrar
+
+from .isolamento import contexto
 from .models import Organizacao
 from .servicos import criar_organizacao_com_admin
 
@@ -68,13 +72,34 @@ class OrganizacaoAdmin(admin.ModelAdmin):
 
     def save_model(self, request, obj, form, change):
         if change:
-            return super().save_model(request, obj, form, change)
-        organizacao, _ = criar_organizacao_com_admin(
+            super().save_model(request, obj, form, change)
+            if form.changed_data:
+                registrar(
+                    request,
+                    Acao.ORGANIZACAO_ALTERADA,
+                    organizacao_id=obj.pk,
+                    campos=form.changed_data,
+                    ativa=obj.ativa,
+                )
+            return
+        organizacao, admin_org = criar_organizacao_com_admin(
             nome=form.cleaned_data["nome"],
             admin_email=form.cleaned_data["admin_email"],
             admin_nome=form.cleaned_data["admin_nome"],
             admin_senha=form.cleaned_data["admin_senha1"],
         )
+        registrar(
+            request, Acao.ORGANIZACAO_CRIADA, organizacao_id=organizacao.pk, nome=organizacao.nome
+        )
+        # O primeiro admin também aparece na auditoria da própria organização.
+        with contexto(organizacao_id=organizacao.pk):
+            registrar(
+                request,
+                Acao.USUARIO_CRIADO,
+                alvo_id=admin_org.pk,
+                alvo_email=admin_org.email,
+                papel="admin",
+            )
         # O admin do Django continua usando o objeto que ele já tem em mãos.
         obj.pk = organizacao.pk
         obj.criada_em = organizacao.criada_em

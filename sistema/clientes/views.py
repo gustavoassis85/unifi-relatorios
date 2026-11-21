@@ -2,6 +2,8 @@ from django.contrib import messages
 from django.shortcuts import get_object_or_404, redirect, render
 from django.views.decorators.http import require_http_methods
 
+from auditoria.models import Acao
+from auditoria.registro import registrar
 from organizacoes import papeis
 from organizacoes.permissoes import exige
 
@@ -25,6 +27,7 @@ def novo(request):
     form = ClienteForm(request.POST or None)
     if request.method == "POST" and form.is_valid():
         cliente = form.save()
+        registrar(request, Acao.CLIENTE_CRIADO, cliente_id=cliente.pk, nome=cliente.nome)
         messages.success(request, f"Cliente {cliente.nome} cadastrado.")
         return redirect("clientes:lista")
     return render(request, "clientes/form.html", {"form": form, "titulo": "Novo cliente"})
@@ -34,9 +37,18 @@ def novo(request):
 @require_http_methods(["GET", "POST"])
 def editar(request, pk):
     cliente = _cliente_da_organizacao(pk)
+    nome_antes = cliente.nome  # a validação do formulário já altera o objeto
     form = ClienteForm(request.POST or None, instance=cliente)
     if request.method == "POST" and form.is_valid():
         form.save()
+        if cliente.nome != nome_antes:
+            registrar(
+                request,
+                Acao.CLIENTE_ALTERADO,
+                cliente_id=cliente.pk,
+                nome_antes=nome_antes,
+                nome_depois=cliente.nome,
+            )
         messages.success(request, "Cliente atualizado.")
         return redirect("clientes:lista")
     return render(
@@ -49,8 +61,9 @@ def editar(request, pk):
 def apagar(request, pk):
     cliente = _cliente_da_organizacao(pk)
     if request.method == "POST":
-        nome = cliente.nome
+        nome, cliente_id = cliente.nome, cliente.pk
         cliente.delete()
+        registrar(request, Acao.CLIENTE_APAGADO, cliente_id=cliente_id, nome=nome)
         messages.success(request, f"Cliente {nome} apagado.")
         return redirect("clientes:lista")
     return render(request, "clientes/apagar.html", {"cliente": cliente})
