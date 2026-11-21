@@ -48,6 +48,7 @@ INSTALLED_APPS = [
 
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
+    "csp.middleware.CSPMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.locale.LocaleMiddleware",
     "django.middleware.common.CommonMiddleware",
@@ -168,3 +169,46 @@ USE_TZ = True
 STATIC_URL = "static/"
 STATICFILES_DIRS = [BASE_DIR / "static"]
 STATIC_ROOT = BASE_DIR / "staticfiles"
+
+# Segurança da aplicação ------------------------------------------------------
+
+# Cookies: só por conexão segura, fora do alcance de JavaScript e não enviados
+# por outros sites. Navegadores atuais tratam http://localhost como seguro.
+SESSION_COOKIE_SECURE = True
+SESSION_COOKIE_HTTPONLY = True
+SESSION_COOKIE_SAMESITE = "Lax"
+CSRF_COOKIE_SECURE = True
+CSRF_COOKIE_HTTPONLY = True
+CSRF_COOKIE_SAMESITE = "Strict"
+
+# Cabeçalhos
+X_FRAME_OPTIONS = "DENY"
+SECURE_CONTENT_TYPE_NOSNIFF = True
+SECURE_REFERRER_POLICY = "same-origin"
+SECURE_CROSS_ORIGIN_OPENER_POLICY = "same-origin"
+
+# CSP: só scripts, estilos e imagens do próprio sistema; nada inline, nada de fora.
+# (data: em imagens é o QR code do MFA.)
+from csp.constants import NONE, SELF  # noqa: E402
+
+CONTENT_SECURITY_POLICY = {
+    "DIRECTIVES": {
+        "default-src": [SELF],
+        "script-src": [SELF],
+        "style-src": [SELF],
+        "img-src": [SELF, "data:"],
+        "font-src": [SELF],
+        "connect-src": [SELF],
+        "form-action": [SELF],
+        "base-uri": [SELF],
+        "object-src": [NONE],
+        "frame-ancestors": [NONE],
+    }
+}
+
+# HTTPS: ligado na publicação (DJANGO_HTTPS=1). No computador local fica desligado,
+# e o check --deploy só aponta estes dois itens.
+if os.environ.get("DJANGO_HTTPS", "0") == "1":
+    SECURE_SSL_REDIRECT = True
+    SECURE_HSTS_SECONDS = 60 * 60 * 24 * 365
+    SECURE_HSTS_INCLUDE_SUBDOMAINS = False

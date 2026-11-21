@@ -3,6 +3,8 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
+  {# O HTMX não injeta estilos inline (a CSP bloquearia). #}
+  <meta name="htmx-config" content='{"includeIndicatorStyles": false}'>
   <title>{% block head_title %}{% endblock head_title %} · Dashboard UniFi</title>
   <link rel="stylesheet" href="{% static 'css/sistema.css' %}">
   <script src="{% static 'js/htmx.min.js' %}" defer></script>
