@@ -1,0 +1,90 @@
+/* Visual provisório da etapa 1. O visual final vem numa etapa própria. */
+:root {
+  --fundo: #ffffff;
+  --superficie: #f6f7f9;
+  --borda: #dfe2e6;
+  --texto: #1f2328;
+  --suave: #5b636e;
+  --acao: #006fff;
+  --perigo: #c62828;
+  --sucesso: #1b7f3b;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--texto);
+  background: var(--fundo);
+}
+
+.topo {
+  display: flex;
+  align-items: center;
+  gap: 24px;
+  padding: 12px 24px;
+  border-bottom: 1px solid var(--borda);
+}
+.topo .marca { font-weight: 600; }
+.topo nav { display: flex; gap: 16px; align-items: center; }
+.topo .organizacao { color: var(--suave); }
+.topo .conta { margin-left: auto; display: flex; gap: 16px; align-items: center; }
+.topo form { margin: 0; }
+
+main { max-width: 880px; padding: 24px; }
+
+h1 { font-size: 20px; font-weight: 600; margin: 0 0 16px; }
+
+a { color: var(--acao); text-decoration: none; }
+a:hover { text-decoration: underline; }
+
+.cabecalho { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
+.cabecalho h1 { margin: 0; }
+
+table { width: 100%; border-collapse: collapse; border: 1px solid var(--borda); }
+th, td { text-align: left; padding: 8px 12px; border-bottom: 1px solid var(--borda); }
+th { font-weight: 500; color: var(--suave); background: var(--superficie); }
+td.acoes { text-align: right; white-space: nowrap; }
+td.acoes a + a { margin-left: 16px; }
+
+.campo { display: flex; flex-direction: column; gap: 4px; margin-bottom: 16px; max-width: 400px; }
+.campo label { font-weight: 500; }
+.campo small { color: var(--suave); font-size: 12px; }
+input[type="text"], input[type="email"], input[type="password"], select {
+  font: inherit;
+  padding: 8px;
+  border: 1px solid var(--borda);
+  border-radius: 4px;
+}
+input:focus-visible, select:focus-visible, button:focus-visible, a:focus-visible {
+  outline: 2px solid var(--acao);
+  outline-offset: 2px;
+}
+
+button, .botao {
+  font: inherit;
+  font-weight: 500;
+  padding: 8px 16px;
+  border: 1px solid var(--acao);
+  border-radius: 4px;
+  background: var(--acao);
+  color: #fff;
+  cursor: pointer;
+}
+.botao:hover { text-decoration: none; }
+button.perigo { background: var(--perigo); border-color: var(--perigo); }
+button.link { background: none; border: none; padding: 0; color: var(--acao); font-weight: 400; }
+
+.botoes { display: flex; gap: 16px; align-items: center; }
+
+.erro { color: var(--perigo); margin: 0; }
+div.erro { margin-bottom: 16px; }
+
+.mensagens { list-style: none; padding: 0; margin: 0 0 16px; }
+.mensagens li { padding: 8px 12px; border: 1px solid var(--borda); border-radius: 4px; }
+.mensagens li.success { border-color: var(--sucesso); color: var(--sucesso); }
+
+.vazio, .nota { color: var(--suave); }

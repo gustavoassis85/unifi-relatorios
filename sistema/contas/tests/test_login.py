@@ -15,6 +15,7 @@ URL_LOGIN = reverse("account_login")
 URL_ATIVAR_MFA = reverse("mfa_activate_totp")
 URL_CODIGO_MFA = reverse("mfa_authenticate")
 URL_CONFIRMAR_SENHA = reverse("account_reauthenticate")
+URL_CLIENTES = reverse("clientes:lista")
 
 
 def entrar(client, email, senha=SENHA):
@@ -44,7 +45,7 @@ def dono():
 def test_operador_entra_com_email_e_senha(client, operador):
     resposta = entrar(client, "OP@a.com")
     assert resposta.status_code == 302
-    assert client.get(reverse("inicio")).status_code == 200
+    assert client.get(URL_CLIENTES).status_code == 200
 
 
 def test_senha_errada_nao_entra(client, operador):
@@ -118,7 +119,7 @@ def test_admin_configura_o_mfa_e_passa_a_entrar(client, org_e_admin):
     pagina = client.get(URL_ATIVAR_MFA)
     segredo = pagina.context["form"].secret
     client.post(URL_ATIVAR_MFA, {"code": codigo_atual(segredo)})
-    assert client.get(reverse("inicio")).status_code == 200
+    assert client.get(URL_CLIENTES).status_code == 200
 
 
 def test_admin_sem_mfa_ainda_consegue_sair(client, org_e_admin):
@@ -130,7 +131,7 @@ def test_admin_sem_mfa_ainda_consegue_sair(client, org_e_admin):
 
 def test_operador_nao_e_obrigado_a_ter_mfa(client, operador):
     entrar(client, "op@a.com")
-    assert client.get(reverse("inicio")).status_code == 200
+    assert client.get(URL_CLIENTES).status_code == 200
 
 
 def test_admin_com_mfa_precisa_do_codigo_para_entrar(client, org_e_admin):
@@ -144,7 +145,7 @@ def test_admin_com_mfa_precisa_do_codigo_para_entrar(client, org_e_admin):
 
     resposta = client.post(URL_CODIGO_MFA, {"code": codigo_atual(segredo)})
     assert resposta.status_code == 302
-    assert client.get(reverse("inicio")).status_code == 200
+    assert client.get(URL_CLIENTES).status_code == 200
 
 
 def test_codigo_errado_nao_entra(client, org_e_admin):
@@ -190,4 +191,4 @@ def test_login_do_admin_nunca_aceita_senha(client, dono, operador):
         reverse("admin:login"), {"username": "dono@plataforma.com", "password": SENHA}
     )
     assert client.get(URL_ADMIN).status_code == 302
-    assert client.get(reverse("inicio")).context["user"].email == "op@a.com"
+    assert client.get(URL_CLIENTES).context["user"].email == "op@a.com"

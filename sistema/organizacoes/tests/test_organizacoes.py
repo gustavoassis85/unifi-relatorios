@@ -132,8 +132,8 @@ def test_admin_de_organizacao_nao_entra_no_admin_do_django(client):
     ativar_mfa(usuario)
     client.force_login(usuario)
     resposta = client.get(URL_ADMIN, follow=True)
-    # Vai parar no início do sistema, nunca numa página do admin do Django.
-    assert resposta.redirect_chain[-1][0] == "/"
+    # Vai parar na tela do sistema, nunca numa página do admin do Django.
+    assert resposta.redirect_chain[-1][0] == "/clientes/"
     assert resposta.status_code == 200
 
 

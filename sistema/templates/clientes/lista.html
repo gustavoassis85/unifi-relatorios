@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+{% block head_title %}Clientes{% endblock %}
+{% block content %}
+  <div class="cabecalho">
+    <h1>Clientes</h1>
+    {% if pode_editar_clientes %}<a class="botao" href="{% url 'clientes:novo' %}">Cadastrar cliente</a>{% endif %}
+  </div>
+  {% if clientes %}
+    <table>
+      <thead><tr><th>Nome</th><th>Cadastrado em</th>{% if pode_editar_clientes %}<th></th>{% endif %}</tr></thead>
+      <tbody>
+        {% for cliente in clientes %}
+          <tr>
+            <td>{{ cliente.nome }}</td>
+            <td>{{ cliente.criado_em|date:"d/m/Y" }}</td>
+            {% if pode_editar_clientes %}
+              <td class="acoes">
+                <a href="{% url 'clientes:editar' cliente.pk %}">Editar</a>
+                <a href="{% url 'clientes:apagar' cliente.pk %}">Apagar</a>
+              </td>
+            {% endif %}
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  {% else %}
+    <p class="vazio">Nenhum cliente cadastrado ainda.
+      {% if pode_editar_clientes %}<a href="{% url 'clientes:novo' %}">Cadastrar o primeiro</a>.{% endif %}</p>
+  {% endif %}
+{% endblock %}

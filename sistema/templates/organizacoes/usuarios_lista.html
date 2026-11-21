@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+{% block head_title %}Usuários{% endblock %}
+{% block content %}
+  <div class="cabecalho">
+    <h1>Usuários</h1>
+    <a class="botao" href="{% url 'usuarios:novo' %}">Cadastrar usuário</a>
+  </div>
+  <table>
+    <thead><tr><th>E-mail</th><th>Nome</th><th>Papel</th><th>Situação</th><th></th></tr></thead>
+    <tbody>
+      {% for v in vinculos %}
+        <tr>
+          <td>{{ v.usuario.email }}</td>
+          <td>{{ v.usuario.nome }}</td>
+          <td>{{ v.get_papel_display }}</td>
+          <td>{% if v.usuario.is_active %}Ativo{% else %}Desativado{% endif %}</td>
+          <td class="acoes"><a href="{% url 'usuarios:editar' v.usuario_id %}">Editar</a></td>
+        </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  <p class="nota">Admin gerencia usuários e clientes e precisa de MFA. Operador cadastra e edita clientes. Leitura só vê.</p>
+{% endblock %}

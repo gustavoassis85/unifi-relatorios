@@ -6,6 +6,9 @@ from django.urls import reverse
 
 @login_required
 def inicio(request):
+    if getattr(request, "vinculo", None):
+        return redirect("clientes:lista")
+    # Sem organização: o dono da plataforma (ou alguém de organização inativa).
     return render(request, "inicio.html")
 
 

@@ -1,17 +1,11 @@
-<!DOCTYPE html>
-<html lang="pt-br">
-<head>
-  <meta charset="utf-8">
-  <title>Dashboard UniFi</title>
-</head>
-<body>
-  <main>
-    <h1>Dashboard UniFi</h1>
-    <p>Você entrou como {{ user.email }}.</p>
-    <form method="post" action="{% url 'account_logout' %}">
-      {% csrf_token %}
-      <button type="submit">Sair</button>
-    </form>
-  </main>
-</body>
-</html>
+{% extends "base.html" %}
+{% block head_title %}Início{% endblock %}
+{% block content %}
+  <h1>Início</h1>
+  {% if user.is_superuser %}
+    <p>Você é o dono da plataforma. Organizações e usuários são gerenciados no
+      <a href="{% url 'admin:index' %}" hx-boost="false">admin do Django</a>.</p>
+  {% else %}
+    <p>Sua conta não está ligada a uma organização ativa. Fale com o administrador.</p>
+  {% endif %}
+{% endblock %}
