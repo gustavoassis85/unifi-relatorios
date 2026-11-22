@@ -94,6 +94,8 @@ def agendar_coletas(agora):
 def coletar_cliente(tarefa_):
     org_id = tarefa_.organizacao_id
     agora = timezone.now()
+    if not Organizacao.objects.filter(pk=org_id, ativa=True).exists():
+        raise ErroDefinitivo("Organização desativada.")
     with contexto(organizacao_id=org_id):
         cliente = Cliente.objects.filter(pk=tarefa_.cliente_id).first()
         if cliente is None:

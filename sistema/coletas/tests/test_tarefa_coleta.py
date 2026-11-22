@@ -212,3 +212,14 @@ def test_banco_recusa_execucao_com_cliente_de_outra_organizacao(cenario):
             )
             sql("set constraints all immediate")
         assert "cliente_mesma_org" in str(erro.value)
+
+
+def test_tarefa_de_organizacao_desativada_nao_roda(cenario, unifi, partes):
+    partes(("Consoles", lambda ctx: "ok"))
+    t = coleta.enfileirar_coleta(cenario.org_a.pk, cenario.cliente_a.pk)
+    cenario.org_a.ativa = False
+    cenario.org_a.save()
+    executar(pegar_proxima())
+    t = Tarefa.objects.get(pk=t.pk)
+    assert t.situacao == Situacao.FALHOU and t.erro == "Organização desativada."
+    assert unifi == []
