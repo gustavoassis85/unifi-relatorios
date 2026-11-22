@@ -69,7 +69,9 @@ def unifi(monkeypatch):
 
 
 @pytest.fixture
-def cenario(msps):
+def cenario(msps, monkeypatch):
+    # Só as partes deste arquivo (equipamentos tem testes próprios).
+    monkeypatch.setattr(coleta, "_partes", [p for p in coleta._partes if p[1] in ("Consoles", "WAN")])
     for org, cliente, texto in [
         (msps.org_a, msps.cliente_a, "chaveDoClienteA-0123456789-abcd"),
         (msps.org_b, msps.cliente_b, "chaveDoClienteB-0123456789-wxyz"),
