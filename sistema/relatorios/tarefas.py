@@ -12,6 +12,7 @@ from tarefas.periodicas import periodica
 from .models import Relatorio, SituacaoRelatorio
 from .montagem import montar
 from .pdf import ErroPdf, gerar_pdf
+from .sinais import relatorio_pronto
 
 log = logging.getLogger("relatorios")
 
@@ -59,6 +60,10 @@ def gerar_relatorio(tarefa_):
         relatorio.save(update_fields=["html", "pdf", "higiene", "situacao", "pronto_em"])
     if montado.erros:
         log.warning("Relatório %s saiu com regras em erro: %s", relatorio.pk, montado.erros)
+    for receptor, resultado in relatorio_pronto.send_robust(sender=Relatorio, relatorio=relatorio):
+        if isinstance(resultado, Exception):
+            log.error("Erro em %s depois do relatório %s ficar pronto", receptor.__qualname__, relatorio.pk,
+                      exc_info=resultado)
 
 
 @periodica("apagar_relatorios_antigos", hora=4, minuto=10)

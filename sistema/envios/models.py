@@ -115,3 +115,32 @@ class Agendamento(DoCliente):
             return f"Todo dia {self.dia_do_mes}, às {self.hora:02d}:00"
         artigo = "Todo" if self.dia_da_semana >= 5 else "Toda"   # sábado e domingo
         return f"{artigo} {dict(DIAS_DA_SEMANA)[self.dia_da_semana]}, às {self.hora:02d}:00"
+
+
+class SituacaoEnvio(models.TextChoices):
+    PENDENTE = "pendente", "Enviando"
+    ENVIADO = "enviado", "Enviado"
+    NAO_ENVIADO = "nao_enviado", "Não enviado"
+    FALHOU = "falhou", "Envio falhou"
+
+
+class Envio(DoCliente):
+    """Um envio de relatório por e-mail. Apagado junto com o relatório (13 meses)."""
+
+    relatorio = models.ForeignKey("relatorios.Relatorio", on_delete=models.CASCADE, related_name="+",
+                                  verbose_name="relatório")
+    destinatarios = models.JSONField("destinatários", default=list)
+    situacao = models.CharField("situação", max_length=12, choices=SituacaoEnvio.choices,
+                                default=SituacaoEnvio.PENDENTE)
+    motivo = models.CharField("motivo", max_length=300, blank=True)
+    tentativas = models.PositiveSmallIntegerField("tentativas", default=0)
+    pedido_por = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True,
+                                   related_name="+", verbose_name="reenviado por")
+    criado_em = models.DateTimeField("criado em", default=timezone.now)
+    enviado_em = models.DateTimeField("enviado em", null=True, blank=True)
+
+    class Meta:
+        verbose_name = "envio"
+        verbose_name_plural = "envios"
+        ordering = ["-criado_em"]
+        indexes = [models.Index(fields=["relatorio", "-criado_em"])]

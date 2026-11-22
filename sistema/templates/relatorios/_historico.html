@@ -8,11 +8,23 @@
             <td>{{ r.rotulo }}</td>
             <td>{% if r.origem == "agendado" %}Agendamento{% elif r.pedido_por %}{{ r.pedido_por.nome|default:r.pedido_por.email }}{% else %}—{% endif %}</td>
             <td>{{ r.pedido_em|date:"d/m/Y H:i" }}</td>
-            <td>{% if r.situacao == "pronto" %}<span class="ok">Pronto</span>{% elif r.situacao == "falhou" %}<span class="falha" title="{{ r.erro }}">Falhou</span>{% else %}Gerando…{% endif %}</td>
+            <td>{% if r.situacao == "pronto" %}<span class="ok">Pronto</span>{% elif r.situacao == "falhou" %}<span class="falha" title="{{ r.erro }}">Falhou</span>{% else %}Gerando…{% endif %}
+              {% with e=r.envio %}{% if e %}<br><small>
+                {% if e.situacao == "enviado" %}<span class="ok">Enviado em {{ e.enviado_em|date:"d/m/Y H:i" }} para {{ e.destinatarios|length }} destinatário{{ e.destinatarios|length|pluralize }}</span>
+                {% elif e.situacao == "pendente" %}{% if e.tentativas %}Envio: nova tentativa em breve ({{ e.motivo }}){% else %}Enviando por e-mail…{% endif %}
+                {% elif e.situacao == "nao_enviado" %}Não enviado: {{ e.motivo }}
+                {% else %}<span class="falha">Envio falhou: {{ e.motivo }}</span>{% endif %}
+              </small>{% endif %}{% endwith %}
+            </td>
             <td class="acoes">
               {% if r.situacao == "pronto" %}
                 <a href="{% url 'relatorios_cliente:ver' cliente.pk r.pk %}" target="_blank" rel="noopener">Ver</a>
                 <a href="{% url 'relatorios_cliente:baixar' cliente.pk r.pk %}" hx-boost="false">Baixar PDF</a>
+                {% if pode_agendar and r.agendamento_id and r.envio.situacao != "pendente" %}
+                  <form method="post" action="{% url 'envios_cliente:reenviar' cliente.pk r.pk %}">
+                    {% csrf_token %}<button type="submit" class="link">Reenviar</button>
+                  </form>
+                {% endif %}
               {% elif r.situacao == "falhou" %}
                 <span class="nota">{{ r.erro }}</span>
               {% endif %}

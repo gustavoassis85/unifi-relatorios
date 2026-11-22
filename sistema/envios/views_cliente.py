@@ -91,3 +91,31 @@ def excluir(request, pk, agendamento_pk):
         messages.success(request, f"Agendamento excluído: {detalhes['frequencia']}.")
         return _voltar(cliente)
     return render(request, "envios/agendamento_excluir.html", {"cliente": cliente, "agendamento": agendamento})
+
+
+@exige(papeis.pode_agendar)
+@require_http_methods(["POST"])
+def reenviar(request, pk, relatorio_pk):
+    from relatorios.models import Relatorio, SituacaoRelatorio
+
+    from .models import Envio, SituacaoEnvio
+    from .tarefas import criar_envio
+
+    cliente = get_object_or_404(Cliente.objects.select_for_update(), pk=pk)
+    relatorio = get_object_or_404(Relatorio.objects.defer("html", "pdf").select_related("agendamento"),
+                                  pk=relatorio_pk, cliente=cliente, situacao=SituacaoRelatorio.PRONTO)
+    agendamento = relatorio.agendamento
+    if agendamento is None or not agendamento.destinatarios:
+        messages.error(request, "Este relatório não tem agendamento com destinatários para reenviar.")
+        return _voltar(cliente)
+    if Envio.objects.filter(relatorio=relatorio, situacao=SituacaoEnvio.PENDENTE).exists():
+        messages.error(request, "Este relatório já está sendo enviado.")
+        return _voltar(cliente)
+    envio = criar_envio(relatorio, agendamento.destinatarios, pedido_por=request.user)
+    registrar(request, Acao.RELATORIO_REENVIADO, cliente_id=cliente.pk, relatorio_id=relatorio.pk,
+              periodo=relatorio.rotulo, destinatarios=len(envio.destinatarios))
+    if envio.situacao == SituacaoEnvio.NAO_ENVIADO:
+        messages.error(request, f"Não enviado: {envio.motivo}")
+    else:
+        messages.success(request, "Reenvio na fila. O resultado aparece no histórico.")
+    return _voltar(cliente)

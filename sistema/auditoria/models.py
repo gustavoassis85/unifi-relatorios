@@ -33,6 +33,7 @@ class Acao(models.TextChoices):
     AGENDAMENTO_PAUSADO = "agendamento_pausado", "Agendamento pausado"
     AGENDAMENTO_RETOMADO = "agendamento_retomado", "Agendamento retomado"
     AGENDAMENTO_EXCLUIDO = "agendamento_excluido", "Agendamento excluído"
+    RELATORIO_REENVIADO = "relatorio_reenviado", "Relatório reenviado por e-mail"
     ORGANIZACAO_CRIADA = "organizacao_criada", "Organização criada"
     ORGANIZACAO_ALTERADA = "organizacao_alterada", "Organização alterada"
 
