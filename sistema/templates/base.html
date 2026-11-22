@@ -1,0 +1,46 @@
+{% load static %}<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  {# O HTMX não injeta estilos inline (a CSP bloquearia). #}
+  <meta name="htmx-config" content='{"includeIndicatorStyles": false}'>
+  <title>{% block head_title %}{% endblock head_title %} · Dashboard UniFi</title>
+  <link rel="stylesheet" href="{% static 'css/sistema.css' %}">
+  <script src="{% static 'js/htmx.min.js' %}" defer></script>
+  {% block extra_head %}{% endblock extra_head %}
+</head>
+<body hx-boost="true">
+  {% block body %}
+  <header class="topo">
+    <span class="marca">Dashboard UniFi</span>
+    {% if user.is_authenticated %}
+      {% if vinculo %}
+        <nav>
+          <span class="organizacao">{{ vinculo.organizacao.nome }}</span>
+          <a href="{% url 'clientes:lista' %}">Clientes</a>
+          {% if pode_gerenciar_usuarios %}<a href="{% url 'usuarios:lista' %}">Usuários</a>{% endif %}
+        </nav>
+      {% endif %}
+      <div class="conta">
+        <a href="{% url 'mfa_index' %}">{{ user.email }}</a>
+        <form method="post" action="{% url 'account_logout' %}">
+          {% csrf_token %}
+          <button type="submit" class="link">Sair</button>
+        </form>
+      </div>
+    {% endif %}
+  </header>
+
+  <main>
+    {% if messages %}
+      <ul class="mensagens">
+        {% for message in messages %}<li class="{{ message.tags }}">{{ message }}</li>{% endfor %}
+      </ul>
+    {% endif %}
+    {% block content %}{% endblock content %}
+  </main>
+  {% endblock body %}
+  {% block extra_body %}{% endblock extra_body %}
+</body>
+</html>

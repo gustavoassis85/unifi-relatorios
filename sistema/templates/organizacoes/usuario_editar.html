@@ -1,0 +1,14 @@
+{% extends "base.html" %}
+{% block head_title %}{{ vinculo.usuario.email }}{% endblock %}
+{% block content %}
+  <h1>{{ vinculo.usuario.email }}</h1>
+  {% if proprio %}<p class="nota">Esta é a sua conta: papel e situação não podem ser mudados por você.</p>{% endif %}
+  <form method="post" novalidate>
+    {% csrf_token %}
+    {% include "_campos.html" %}
+    <div class="botoes">
+      <button type="submit">Salvar alterações</button>
+      <a href="{% url 'usuarios:lista' %}">Cancelar</a>
+    </div>
+  </form>
+{% endblock %}

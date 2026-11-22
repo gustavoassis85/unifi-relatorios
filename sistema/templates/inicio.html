@@ -1,0 +1,11 @@
+{% extends "base.html" %}
+{% block head_title %}Início{% endblock %}
+{% block content %}
+  <h1>Início</h1>
+  {% if user.is_superuser %}
+    <p>Você é o dono da plataforma. Organizações e usuários são gerenciados no
+      <a href="{% url 'admin:index' %}" hx-boost="false">admin do Django</a>.</p>
+  {% else %}
+    <p>Sua conta não está ligada a uma organização ativa. Fale com o administrador.</p>
+  {% endif %}
+{% endblock %}

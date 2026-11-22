@@ -1,0 +1,13 @@
+{% extends "base.html" %}
+{% block head_title %}Apagar {{ cliente.nome }}{% endblock %}
+{% block content %}
+  <h1>Apagar {{ cliente.nome }}?</h1>
+  <p>O cliente sai da lista e não pode ser recuperado.</p>
+  <form method="post">
+    {% csrf_token %}
+    <div class="botoes">
+      <button type="submit" class="perigo">Apagar {{ cliente.nome }}</button>
+      <a href="{% url 'clientes:lista' %}">Cancelar</a>
+    </div>
+  </form>
+{% endblock %}

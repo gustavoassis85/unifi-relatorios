@@ -5,7 +5,7 @@ SaaS de relatórios para MSPs que usam UniFi. Produto: relatório de saúde da r
 
 Duas fases:
 - Fase 1, MVP do lab (concluída): scripts Python na raiz do projeto que coletam, geram os pontos de atenção e montam o relatório HTML de um ambiente.
-- Fase 2, sistema (em construção): aplicação web multi-tenant em sistema/, que reaproveita os coletores, as regras e o relatório do MVP.
+- Fase 2, sistema (em construção, etapa 1 concluída): aplicação web multi-tenant em sistema/, que reaproveita os coletores, as regras e o relatório do MVP.
 
 ## Como trabalhar com o Gustavo
 - Ele não é desenvolvedor. Guiar passo a passo, um passo por vez.
@@ -118,8 +118,8 @@ Fase 1, MVP do lab (concluída):
    python coletar.py --forcar refaz consumo e catálogos na hora, buscando 30 dias.
 
 Fase 2, sistema (em sistema/):
-1. Fundação: projeto Django, PostgreSQL, login com MFA, organizações, papéis, isolamento e testes de isolamento.  ← próxima (detalhe em planos/etapa-1-fundacao.md)
-2. Clientes e conexões: cadastro, cofre de credenciais e "Testar conexão" (nuvem primeiro, IP direto depois).
+1. Fundação (concluída em 21/11/2026): projeto Django, PostgreSQL, login com MFA, organizações, papéis, isolamento com RLS, auditoria e testes de isolamento. Detalhe em planos/etapa-1-fundacao.md; como subir em sistema/README.md.
+2. Clientes e conexões: cadastro, cofre de credenciais e "Testar conexão" (nuvem primeiro, IP direto depois).  ← próxima
 3. Coletores rodando por organização, em segundo plano (os módulos de coletor/ passam para o sistema).
 4. Relatórios sob demanda e PDF automático (Playwright). Entram aqui as pendências do relatório: juntar achados relacionados num incidente (ex.: horas sem dado + perda alta no mesmo dia); registros antigos (network-server) vão para uma seção de higiene da conta, não para o relatório do cliente.
 5. Agendamentos, SMTP e o fallback para PDF.
