@@ -5,7 +5,7 @@ SaaS de relatórios para MSPs que usam UniFi. Produto: relatório de saúde da r
 
 Duas fases:
 - Fase 1, MVP do lab (concluída): scripts Python na raiz do projeto que coletam, geram os pontos de atenção e montam o relatório HTML de um ambiente.
-- Fase 2, sistema (em construção, etapa 1 concluída): aplicação web multi-tenant em sistema/, que reaproveita os coletores, as regras e o relatório do MVP.
+- Fase 2, sistema (em construção, etapas 1 e 2 concluídas): aplicação web multi-tenant em sistema/, que reaproveita os coletores, as regras e o relatório do MVP.
 
 ## Como trabalhar com o Gustavo
 - Ele não é desenvolvedor. Guiar passo a passo, um passo por vez.
@@ -77,7 +77,7 @@ Connector (API Network de cada console, via nuvem):
 
 ## Regras obrigatórias do código
 Coleta (MVP e sistema):
-- Só leitura. GET apenas nos caminhos de coletor/api.py (GET_PERMITIDOS). POST apenas nos relatórios daily.site, daily.user e hourly.site (POST_PERMITIDOS), que são consultas.
+- Só leitura. GET apenas nos caminhos de coletor/api.py e, no sistema, de sistema/unifi/api.py (GET_PERMITIDOS). POST apenas nos relatórios daily.site, daily.user e hourly.site (POST_PERMITIDOS), que são consultas.
 - LGPD: aplicativos só no total da rede; não coletamos nem mostramos uso de aplicativo por pessoa/dispositivo.
 - Connector: no máximo ~85 chamadas/min por console (classe Ritmo em coletor/equipamentos.py).
 - Detalhe de portas/rádios em toda coleta: uma foto só engana (PC em repouso negocia 10/100 Mbps). Regra de "porta abaixo da capacidade" só vira achado se persistir em várias amostras.
@@ -123,8 +123,8 @@ Fase 1, MVP do lab (concluída):
 
 Fase 2, sistema (em sistema/):
 1. Fundação (concluída em 21/11/2026): projeto Django, PostgreSQL, login com MFA, organizações, papéis, isolamento com RLS, auditoria e testes de isolamento. Detalhe em planos/etapa-1-fundacao.md; como subir em sistema/README.md.
-2. Clientes e conexões: cadastro, cofre de credenciais e "Testar conexão" (nuvem primeiro, IP direto depois).  ← próxima
-3. Coletores rodando por organização, em segundo plano (os módulos de coletor/ passam para o sistema).
+2. Clientes e conexões (concluída em 21/11/2026): chave da UniFi por cliente cifrada no cofre (cofre/, UNIFI_CHAVE_MESTRA), cliente da api.ui.com só leitura (unifi/api.py), "Testar conexão" e consoles por cliente com "acompanhar" (conexoes/). IP direto fica para depois da publicação. Detalhe em planos/etapa-2-clientes-conexoes.md.
+3. Coletores rodando por organização, em segundo plano (os módulos de coletor/ passam para o sistema). Só consoles com "acompanhar" ligado; a chave sai de ChaveUniFi.abrir() e as chamadas passam por unifi/api.py. Rever aqui: o "Testar conexão" segura a transação da requisição por até 30 s.  ← próxima
 4. Relatórios sob demanda e PDF automático (Playwright). Entram aqui as pendências do relatório: juntar achados relacionados num incidente (ex.: horas sem dado + perda alta no mesmo dia); registros antigos (network-server) vão para uma seção de higiene da conta, não para o relatório do cliente.
 5. Agendamentos, SMTP e o fallback para PDF.
 6. Publicação num servidor, com backup e monitoramento, e revisão de segurança por um dev antes do primeiro MSP pagante.
