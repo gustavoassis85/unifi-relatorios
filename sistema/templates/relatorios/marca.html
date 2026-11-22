@@ -1,0 +1,16 @@
+{% extends "base.html" %}
+{% block head_title %}Marca{% endblock %}
+{% block content %}
+  <h1>Marca nos relatórios</h1>
+  <p class="nota">Nome, contato, logo e tema que aparecem nos relatórios dos seus clientes.</p>
+  {% if logo %}
+    <div class="bloco previa-logo"><img src="{{ logo }}" alt="Logo atual de {{ marca.empresa }}"></div>
+  {% endif %}
+  <form method="post" enctype="multipart/form-data" novalidate>
+    {% csrf_token %}
+    {% include "_campos.html" %}
+    <div class="botoes">
+      <button type="submit">Salvar marca</button>
+    </div>
+  </form>
+{% endblock %}
