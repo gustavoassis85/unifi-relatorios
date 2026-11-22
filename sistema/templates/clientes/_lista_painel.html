@@ -1,0 +1,14 @@
+<ul class="lista-clientes" id="lista-painel">
+  {% for s in situacoes %}
+    <li>
+      <a href="{% url 'clientes:detalhe' s.cliente.pk %}" {% if cliente.pk == s.cliente.pk %}aria-current="page"{% endif %}
+         title="{{ s.cliente.nome }}: {{ s.rotulo_estado|lower }}. {{ s.resumo }}">
+        <span class="ponto {{ s.estado }}" aria-hidden="true"></span>
+        <span class="nome">{{ s.cliente.nome }}</span>
+        <span class="so-leitor">({{ s.rotulo_estado|lower }})</span>
+      </a>
+    </li>
+  {% empty %}
+    <li class="vazio">{% if filtrado %}Nenhum cliente com esse filtro.{% else %}Nenhum cliente cadastrado.{% endif %}</li>
+  {% endfor %}
+</ul>

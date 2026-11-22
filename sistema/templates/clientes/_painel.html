@@ -1,0 +1,27 @@
+<aside class="painel" id="painel-clientes" aria-label="Lista de clientes">
+  <div class="cabeca">
+    <div class="linha">
+      <h2>Clientes</h2>
+      <button type="button" class="botao-icone botao-recolher" data-recolher-painel aria-expanded="true"
+              aria-controls="painel-clientes" title="Recolher a lista" aria-label="Recolher a lista de clientes">
+        <svg class="icone p" aria-hidden="true"><use href="#i-recolher"/></svg>
+      </button>
+    </div>
+    <form class="filtros-painel" role="search" action="{% url 'clientes:lista' %}" method="get">
+      <input type="hidden" name="atual" value="{{ cliente.pk|default:'' }}">
+      <div class="busca">
+        <label class="so-leitor" for="busca-cliente">Buscar cliente</label>
+        <svg class="icone p" aria-hidden="true"><use href="#i-buscar"/></svg>
+        <input type="search" id="busca-cliente" name="busca" placeholder="Buscar cliente" autocomplete="off"
+               maxlength="100" hx-get="{% url 'clientes:painel' %}" hx-include="closest form"
+               hx-target="#lista-painel" hx-swap="outerHTML" hx-trigger="input changed delay:250ms, search">
+      </div>
+      <label class="so-leitor" for="filtro-situacao">Situação</label>
+      <select id="filtro-situacao" name="situacao" hx-get="{% url 'clientes:painel' %}" hx-include="closest form"
+              hx-target="#lista-painel" hx-swap="outerHTML" hx-trigger="change">
+        {% for valor, rotulo in filtros_painel %}<option value="{{ valor }}">{{ rotulo }}</option>{% endfor %}
+      </select>
+    </form>
+  </div>
+  {% include "clientes/_lista_painel.html" with situacoes=painel_clientes %}
+</aside>
