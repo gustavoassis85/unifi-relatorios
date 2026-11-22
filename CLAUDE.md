@@ -25,7 +25,7 @@ MVP (15/11/2026):
 Sistema (15/11/2026):
 - Aplicação web multi-tenant, no modelo do multi-site da UniFi: Organização (MSP) → Clientes → Consoles/Sites. Um MSP nunca enxerga outro.
 - Hospedagem: SaaS na nuvem, hospedado pelo Gustavo para todos os MSPs.
-- Acesso: só o MSP tem login. O cliente final recebe o relatório por e-mail ou PDF, sem login. Papéis dentro da organização: admin, operador, leitura.
+- Acesso: só o MSP tem login. O cliente final recebe o relatório por e-mail ou PDF, sem login. Papéis dentro da organização: admin, operador, leitura. (Acesso de leitura para o cliente final previsto no futuro: ver 21/11/2026.)
 - O dono da plataforma cria as organizações e o primeiro admin de cada uma, mas não vê os dados dos clientes dos MSPs pela aplicação.
 - Stack: Python + Django 5.2 LTS + HTMX + PostgreSQL. Processo em segundo plano para coletas, relatórios e agendamentos. PDF no servidor com Playwright (Chromium sem tela).
 - Conexão com a UniFi: pela nuvem (chave unifi.ui.com) primeiro; IP direto depois, e vai exigir VPN entre o servidor e a rede do cliente.
@@ -33,6 +33,10 @@ Sistema (15/11/2026):
 - Um único modelo de relatório: o do MVP.
 - Cobrança: a definir depois.
 - Plano completo: Claude Doc "Plano do sistema Dashboard UniFi" (https://claude.ai/artifact/Cpr1bsN4jYhU9PMkyEvTx3).
+
+Sistema (21/11/2026):
+- A chave da UniFi é cadastrada por cliente, não por organização. Os consoles que a chave enxerga pertencem a esse cliente.
+- Futuro: o MSP poderá liberar acesso só de leitura para o cliente ver os próprios dashboards (muda o "só o MSP tem login"). Por isso toda tabela com dado de cliente leva o ID do cliente, além do da organização.
 
 ## APIs validadas
 Base: https://api.ui.com — header X-API-Key — certificado válido (não usar verify=False).
