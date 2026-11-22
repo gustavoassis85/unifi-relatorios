@@ -99,3 +99,4 @@ code { font-family: ui-monospace, Consolas, monospace; font-size: 13px; }
 .falha { color: var(--perigo); }
 .botoes form { margin: 0; }
 .mensagens li.error { border-color: var(--perigo); color: var(--perigo); }
+td.acoes form { display: inline; margin-left: 16px; }

@@ -20,6 +20,8 @@ class Acao(models.TextChoices):
     CHAVE_TROCADA = "chave_trocada", "Chave da UniFi trocada"
     CHAVE_APAGADA = "chave_apagada", "Chave da UniFi apagada"
     CONEXAO_TESTADA = "conexao_testada", "Conexão com a UniFi testada"
+    CONSOLE_ACOMPANHADO = "console_acompanhado", "Console passou a ser acompanhado"
+    CONSOLE_NAO_ACOMPANHADO = "console_nao_acompanhado", "Console deixou de ser acompanhado"
     ORGANIZACAO_CRIADA = "organizacao_criada", "Organização criada"
     ORGANIZACAO_ALTERADA = "organizacao_alterada", "Organização alterada"
 

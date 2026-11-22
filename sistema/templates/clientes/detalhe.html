@@ -54,11 +54,23 @@
               <td>{{ console.modelo|default:"—" }}</td>
               <td>{{ console.situacao }}</td>
               <td>{{ console.versao_network|default:"—" }}</td>
-              <td>{{ console.acompanhar|yesno:"Sim,Não" }}</td>
+              <td class="acoes">
+                {{ console.acompanhar|yesno:"Sim,Não" }}
+                {% if pode_testar_conexao %}
+                  {% if console.acompanhar or console.na_conta %}
+                    <form method="post" action="{% url 'conexoes:acompanhar' cliente.pk console.pk %}">
+                      {% csrf_token %}
+                      <input type="hidden" name="acompanhar" value="{% if console.acompanhar %}0{% else %}1{% endif %}">
+                      <button type="submit" class="link">{% if console.acompanhar %}Deixar de acompanhar{% else %}Acompanhar{% endif %}</button>
+                    </form>
+                  {% endif %}
+                {% endif %}
+              </td>
             </tr>
           {% endfor %}
         </tbody>
       </table>
+      <p class="nota">Só os consoles acompanhados entram nas coletas e nos relatórios.</p>
     {% elif chave %}
       <p class="vazio">Nenhum console ainda.{% if pode_testar_conexao %} Use o botão de testar a conexão para buscar os consoles da conta.{% endif %}</p>
     {% else %}

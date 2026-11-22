@@ -86,3 +86,54 @@ def testar(request, pk):
         )
     (messages.success if resultado.ok else messages.error)(request, resultado.mensagem)
     return redirect("clientes:detalhe", pk=cliente.pk)
+
+
+@exige(papeis.pode_testar_conexao)
+@require_http_methods(["POST"])
+def acompanhar(request, pk, console_pk):
+    from django.db import IntegrityError, transaction
+
+    from .models import Console
+
+    cliente = get_object_or_404(Cliente.objects, pk=pk)
+    console = get_object_or_404(Console.objects, pk=console_pk, cliente=cliente)
+    ligar = request.POST.get("acompanhar") == "1"
+    nome = str(console)
+
+    if ligar == console.acompanhar:
+        return redirect("clientes:detalhe", pk=cliente.pk)
+    if ligar and not console.na_conta:
+        messages.error(request, f"{nome} não aparece mais na conta da UniFi deste cliente; não dá para acompanhar.")
+        return redirect("clientes:detalhe", pk=cliente.pk)
+
+    def ja_acompanhado_em():
+        outro = (
+            Console.objects.filter(host_id=console.host_id, acompanhar=True)
+            .exclude(pk=console.pk)
+            .select_related("cliente")
+            .first()
+        )
+        return outro.cliente.nome if outro else None
+
+    if ligar and (outro_cliente := ja_acompanhado_em()):
+        messages.error(request, f"{nome} já é acompanhado no cliente {outro_cliente}. Deixe de acompanhar lá primeiro.")
+        return redirect("clientes:detalhe", pk=cliente.pk)
+
+    console.acompanhar = ligar
+    try:
+        with transaction.atomic():
+            console.save(update_fields=["acompanhar"])
+    except IntegrityError:  # outro usuário ligou o mesmo console ao mesmo tempo
+        messages.error(request, f"{nome} já é acompanhado em outro cliente.")
+        return redirect("clientes:detalhe", pk=cliente.pk)
+
+    registrar(
+        request,
+        Acao.CONSOLE_ACOMPANHADO if ligar else Acao.CONSOLE_NAO_ACOMPANHADO,
+        cliente_id=cliente.pk,
+        cliente=cliente.nome,
+        host_id=console.host_id,
+        console=nome,
+    )
+    messages.success(request, f"{nome} {'passou a ser acompanhado' if ligar else 'deixou de ser acompanhado'}.")
+    return redirect("clientes:detalhe", pk=cliente.pk)
