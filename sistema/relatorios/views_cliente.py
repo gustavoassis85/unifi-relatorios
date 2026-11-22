@@ -1,10 +1,12 @@
 """Relatórios na página do cliente: gerar, histórico, ver e baixar o PDF."""
 import re
 import unicodedata
+from datetime import timedelta
 
 from django.contrib import messages
 from django.http import Http404, HttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
+from django.utils import timezone
 from django.views.decorators.http import require_http_methods
 
 from auditoria.models import Acao
@@ -21,6 +23,15 @@ from .tarefas import enfileirar_relatorio
 CSP_RELATORIO = ("default-src 'none'; style-src 'unsafe-inline'; img-src data:; base-uri 'none'; "
                  "form-action 'none'; frame-ancestors 'none'")
 HISTORICO = 20
+# A geração leva segundos; "gerando" há mais que isso é trabalhador que caiu no meio.
+GERANDO_NO_MAXIMO = timedelta(minutes=15)
+SEM_CACHE = "private, no-store"
+
+
+def _encerrar_travados(cliente):
+    limite = timezone.now() - GERANDO_NO_MAXIMO
+    Relatorio.objects.filter(cliente=cliente, situacao=SituacaoRelatorio.GERANDO, pedido_em__lt=limite).update(
+        situacao=SituacaoRelatorio.FALHOU, erro="A geração não terminou (o trabalhador parou no meio). Peça de novo.")
 
 
 def historico(cliente):
@@ -29,6 +40,7 @@ def historico(cliente):
 
 
 def contexto_relatorios(cliente):
+    _encerrar_travados(cliente)
     relatorios = historico(cliente)
     ultimo_pronto = (Relatorio.objects.filter(cliente=cliente, situacao=SituacaoRelatorio.PRONTO)
                      .only("higiene", "pronto_em", "rotulo").first())
@@ -52,13 +64,15 @@ def _relatorio_pronto(pk, relatorio_pk):
 @exige(papeis.pode_gerar_relatorio)
 @require_http_methods(["POST"])
 def gerar(request, pk):
-    cliente = get_object_or_404(Cliente.objects, pk=pk)
+    # Trava a linha do cliente: dois cliques ao mesmo tempo não criam dois relatórios gerando.
+    cliente = get_object_or_404(Cliente.objects.select_for_update(), pk=pk)
     voltar = redirect("clientes:detalhe", pk=cliente.pk)
     try:
         inicio, fim, rotulo = resolver(request.POST.get("periodo", ""))
     except PeriodoInvalido:
         messages.error(request, "Escolha um dos períodos da lista.")
         return voltar
+    _encerrar_travados(cliente)
     if Relatorio.objects.filter(cliente=cliente, situacao=SituacaoRelatorio.GERANDO).exists():
         messages.error(request, "Já há um relatório deste cliente sendo gerado. Espere ele ficar pronto.")
         return voltar
@@ -84,6 +98,7 @@ def ver(request, pk, relatorio_pk):
     resposta = HttpResponse(relatorio.html, content_type="text/html; charset=utf-8")
     resposta["Content-Security-Policy"] = CSP_RELATORIO
     resposta["Referrer-Policy"] = "no-referrer"
+    resposta["Cache-Control"] = SEM_CACHE
     resposta._csp_exempt = True
     return resposta
 
@@ -98,6 +113,7 @@ def _nome_arquivo(cliente, relatorio):
 def baixar(request, pk, relatorio_pk):
     cliente, relatorio = _relatorio_pronto(pk, relatorio_pk)
     resposta = HttpResponse(bytes(relatorio.pdf), content_type="application/pdf")
+    resposta["Cache-Control"] = SEM_CACHE
     resposta["Content-Disposition"] = f'attachment; filename="{_nome_arquivo(cliente, relatorio)}"'
     registrar(request, Acao.RELATORIO_BAIXADO, cliente_id=cliente.pk, cliente=cliente.nome,
               relatorio_id=relatorio.pk, periodo=relatorio.rotulo)

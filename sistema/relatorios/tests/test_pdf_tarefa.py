@@ -64,7 +64,8 @@ def test_falha_do_chromium_vira_mensagem(monkeypatch, tmp_path):
     monkeypatch.setenv("PLAYWRIGHT_BROWSERS_PATH", str(tmp_path))  # pasta sem Chromium
     with pytest.raises(ErroPdf) as erro:
         gerar_pdf("<html></html>")
-    assert str(erro.value).startswith("Não foi possível gerar o PDF")
+    assert str(erro.value) == "Não foi possível gerar o PDF (o Chromium não está instalado no servidor)."
+    assert str(tmp_path) not in str(erro.value)   # caminho do servidor não vai para a tela
 
 
 # Períodos ------------------------------------------------------------------------------

@@ -5,6 +5,7 @@ O Chromium fica em sistema/.navegadores (instalado com:
 Travas na geração: JavaScript desligado, sem rede (modo offline e toda requisição abortada;
 imagens embutidas em data: continuam funcionando) e tempo limite de 60 s.
 """
+import logging
 import os
 from pathlib import Path
 
@@ -12,6 +13,7 @@ from django.conf import settings
 
 PASTA_NAVEGADORES = Path(settings.BASE_DIR) / ".navegadores"
 TEMPO_LIMITE_MS = 60_000
+log = logging.getLogger("relatorios")
 
 
 class ErroPdf(Exception):
@@ -36,8 +38,16 @@ def _abrir(html, acao):
             finally:
                 navegador.close()
     except ErroPlaywright as erro:
-        primeira_linha = str(erro).strip().splitlines()[0][:200] if str(erro).strip() else erro.__class__.__name__
-        raise ErroPdf(f"Não foi possível gerar o PDF ({primeira_linha}).") from None
+        # O texto do Playwright pode ter caminhos do servidor: vai só para o log; o MSP vê o resumo.
+        log.warning("Falha do Chromium ao gerar o PDF: %s", erro)
+        texto = str(erro)
+        if "Timeout" in texto:
+            motivo = "passou do tempo limite de 60 s"
+        elif "Executable doesn't exist" in texto:
+            motivo = "o Chromium não está instalado no servidor"
+        else:
+            motivo = "falha no Chromium"
+        raise ErroPdf(f"Não foi possível gerar o PDF ({motivo}).") from None
 
 
 def gerar_pdf(html):

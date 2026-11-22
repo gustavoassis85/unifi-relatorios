@@ -1,4 +1,6 @@
 """Telas de relatório: gerar, histórico, ver, baixar, higiene, papéis e isolamento."""
+from datetime import timedelta
+
 import pytest
 from django.urls import reverse
 from django.utils import timezone
@@ -141,3 +143,24 @@ def test_nao_ve_nem_baixa_relatorio_de_outra_organizacao(msps, entrar_como):
     assert client.get(reverse("relatorios_cliente:lista", args=[msps.cliente_b.pk])).status_code == 404
     assert client.post(reverse("relatorios_cliente:gerar", args=[msps.cliente_b.pk]), {"periodo": "7d"}).status_code == 404
     assert "segredo do B" not in detalhe(client, msps.cliente_a)
+
+
+# Revisão de segurança -------------------------------------------------------------------
+
+def test_relatorio_travado_em_gerando_vira_falha_e_libera_novo_pedido(msps, entrar_como):
+    client = entrar_como(msps.admin_a)
+    gerar(client, msps.cliente_a)
+    with contexto(organizacao_id=msps.org_a.pk):
+        Relatorio.objects.update(pedido_em=timezone.now() - timedelta(minutes=20))
+    html = gerar(client, msps.cliente_a, "7d").content.decode()
+    assert "Relatório na fila." in html and "o trabalhador parou no meio" in html
+    with contexto(organizacao_id=msps.org_a.pk):
+        assert sorted(Relatorio.objects.values_list("situacao", flat=True)) == ["falhou", "gerando"]
+
+
+def test_ver_e_baixar_nao_ficam_no_cache(msps, entrar_como):
+    r = pronto(msps.org_a, msps.cliente_a)
+    client = entrar_como(msps.leitor_a)
+    for nome in ("ver", "baixar"):
+        resposta = client.get(reverse(f"relatorios_cliente:{nome}", args=[msps.cliente_a.pk, r.pk]))
+        assert resposta["Cache-Control"] == "private, no-store"

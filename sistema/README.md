@@ -5,6 +5,7 @@ Pronto até aqui:
 - Etapa 1 (fundação): login com MFA, organizações, papéis, cadastro de clientes, isolamento entre MSPs e auditoria.
 - Etapa 2 (clientes e conexões): chave da UniFi de cada cliente guardada cifrada, "Testar conexão" e escolha de quais consoles acompanhar.
 - Etapa 3 (coletores): o trabalhador coleta sozinho, de hora em hora, os consoles acompanhados de todos os clientes.
+- Etapa 4 (relatórios): relatório de saúde da rede por cliente, com a marca do MSP, gerado pelo trabalhador em HTML e PDF, com histórico na página do cliente.
 
 Todos os comandos abaixo são para o PowerShell do Windows e rodam dentro da pasta `sistema`.
 
@@ -29,6 +30,12 @@ Criar o ambiente virtual do Python (fica em `.venv`, fora do Git) e instalar as 
 ```powershell
 python -m venv .venv
 .\.venv\Scripts\python.exe -m pip install -r requirements.txt
+```
+
+Baixar o Chromium sem tela que gera os PDFs (cerca de 290 MB, fica na pasta `sistema\.navegadores`, fora do Git; não instala nada no Windows):
+
+```powershell
+$env:PLAYWRIGHT_BROWSERS_PATH = ".navegadores"; .\.venv\Scripts\python.exe -m playwright install chromium-headless-shell
 ```
 
 Criar o arquivo `.env` com chave e senhas aleatórias (não aparecem na tela; o `.env` nunca vai para o Git):
@@ -93,7 +100,7 @@ As coletas rodam num segundo processo, o trabalhador. Abra outro PowerShell (ou 
 .\.venv\Scripts\python.exe manage.py trabalhador
 ```
 
-Deixe as duas janelas abertas: uma com o site, outra com o trabalhador. Ele coleta todos os clientes no minuto 30 de cada hora, roda os pedidos de "Coletar agora" e, às 3h15 e às 4h, limpa tarefas antigas e dados que passaram do prazo. Se ficar desligado, a coleta roda uma vez assim que ele voltar. Para parar: `Ctrl+C` (ele termina a coleta em andamento antes de sair).
+Deixe as duas janelas abertas: uma com o site, outra com o trabalhador. Ele coleta todos os clientes no minuto 30 de cada hora, roda os pedidos de "Coletar agora" e de relatório e, às 3h15 e às 4h, limpa tarefas antigas e dados que passaram do prazo. Se ficar desligado, a coleta roda uma vez assim que ele voltar. Para parar: `Ctrl+C` (ele termina a coleta em andamento antes de sair).
 
 Para ver os números coletados de um cliente (o número é o que aparece no endereço da página dele, por exemplo `/clientes/3/`):
 
@@ -146,6 +153,16 @@ Precisa de uma chave Site Manager: em unifi.ui.com, menu API, gere uma chave (ou
 5. Na janela do trabalhador, aperte `Ctrl+C`: ele mostra "Parando" e depois "Trabalhador parado".
 6. Entre como admin do outro MSP: nenhuma coleta do cliente do lab aparece.
 
+### Validação da etapa 4 (relatórios)
+
+1. Suba o site e o trabalhador (seção 3).
+2. Como admin do MSP do lab, abra o menu Marca: preencha empresa e contato, escolha o tema e envie um logo PNG ou JPG. Tente enviar um arquivo que não é imagem (um .txt renomeado para .png): deve ser recusado.
+3. Na página do cliente do lab, em Relatórios, escolha "Últimos 7 dias" e clique em "Gerar relatório". A linha aparece como "Gerando…" e vira "Pronto" sozinha em poucos segundos.
+4. Clique em "Ver": o relatório abre numa aba nova, com a marca. Clique em "Baixar PDF" e abra o arquivo.
+5. Compare com o relatório do MVP do mesmo período (`python gerar_relatorio.py --dias 7` na raiz do projeto, arquivo em `dadoselatorios\`): mesmas seções, mesmos números de link, equipamentos e dispositivos. Diferenças esperadas: o do sistema tem uma seção por console do cliente, não traz os registros antigos (eles ficam no bloco "Higiene da conta", só na tela do MSP) e pode ter mais dados onde o MVP ficou com buracos (computador desligado) e no consumo de aplicativos.
+6. Entre como o usuário de leitura: vê e baixa os relatórios, mas não tem o botão "Gerar relatório" nem o menu Marca.
+7. Entre como admin do outro MSP: nenhum relatório do cliente do lab aparece.
+
 ## 6. Troca da chave mestra
 
 Para trocar a `UNIFI_CHAVE_MESTRA` (por exemplo, se o `.env` vazou), com o sistema parado:
@@ -177,6 +194,8 @@ sistema/
   conexoes/           chave da UniFi de cada cliente, testar conexão e consoles
   tarefas/            fila de tarefas no PostgreSQL, tarefas periódicas e o comando trabalhador
   coletas/            coletas portadas do MVP, dados coletados, retenção e resumo_cliente
+  relatorios/         marca da organização, pontos de atenção, relatório HTML (portado do MVP), PDF e telas
+  .navegadores/       Chromium sem tela do Playwright (fora do Git)
   templates/, static/ telas e CSS/HTMX
 ```
 
@@ -199,3 +218,8 @@ sistema/
 - Dados coletados: toda tabela tem organização, cliente e console, sob RLS, e o banco garante que os três batem. Do `/v1/hosts`, nada de e-mail, localização ou usuários; aplicativos só no total da rede.
 - Retenção: amostras de equipamentos e dispositivos e tráfego por dispositivo por 90 dias; agregados do site por 13 meses.
 - Catálogos (nomes de aplicativos e sistemas da UniFi) ficam numa tabela da plataforma, compartilhada por todas as organizações. Para a revisão de segurança antes do primeiro MSP pagante: um console adulterado poderia trocar esses nomes para todos (o texto é sempre escapado na tela, então não vira código).
+- Relatórios: guardados no banco (HTML e PDF) com organização e cliente, sob RLS, por 13 meses. Admin e operador geram; todos os papéis veem e baixam; cada pedido e cada download vão para a auditoria. Um relatório gerando por cliente de cada vez; um que fique "gerando" por mais de 15 minutos (trabalhador caiu) vira falha e libera novo pedido.
+- PDF: o Chromium abre o HTML com JavaScript desligado, sem rede (toda requisição é abortada; só imagens embutidas funcionam) e com tempo limite de 60 s. O erro do Chromium vai para o log; a tela mostra só o resumo.
+- Página do relatório com CSP própria: só estilos e imagens embutidos, nenhum script; sem cache no navegador (também no PDF). Todo texto vindo da UniFi ou do MSP é escapado. O nome do arquivo baixado só tem letras sem acento, números e hífen.
+- Logo da marca: só admin envia; PNG ou JPG conferido pelo conteúdo, até 500 KB, limite de pixels contra imagem "bomba", e regravado como PNG novo (descarta metadados e conteúdo escondido). SVG não é aceito.
+- Higiene da conta (registros antigos e consoles fora do acompanhamento) aparece só na tela do MSP, nunca no relatório do cliente.
