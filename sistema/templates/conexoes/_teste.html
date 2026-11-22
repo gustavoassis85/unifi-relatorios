@@ -1,0 +1,10 @@
+<dd id="teste-conexao"{% if chave.teste_pendente %} hx-get="{% url 'conexoes:situacao_teste' cliente.pk %}" hx-trigger="every 2s" hx-swap="outerHTML"{% endif %}>
+  {% if chave.teste_pendente %}
+    Testando a conexão com a UniFi…
+  {% elif chave.testada_em %}
+    {{ chave.testada_em|date:"d/m/Y H:i" }} ·
+    <span class="{% if chave.teste_ok %}ok{% else %}falha{% endif %}">{{ chave.teste_resultado }}</span>
+  {% else %}
+    Ainda não testada.
+  {% endif %}
+</dd>

@@ -1,19 +1,24 @@
 """Testar a conexão de um cliente com a UniFi e atualizar a lista de consoles.
 
-Roda na hora, dentro da requisição, com prazo de 30 s. Na etapa 3 as coletas passam
-para segundo plano; o teste continua sendo na hora.
+O clique em "Testar conexão" só enfileira (pedir_teste). O trabalhador roda executar_teste:
+lê a chave numa transação curta, consulta a UniFi FORA de transação (até 30 s, sem segurar
+o banco) e grava o resultado e os consoles noutra transação curta.
 """
 from dataclasses import dataclass
 
+from django.contrib.auth import get_user_model
 from django.core.cache import cache
 from django.utils import timezone
 from django.views.decorators.debug import sensitive_variables
 
+from auditoria.models import Acao
+from auditoria.registro import registrar
 from cofre.cifra import ErroCofre
-from organizacoes.isolamento import exigir_organizacao
+from organizacoes.isolamento import contexto, exigir_organizacao
+from tarefas.fila import enfileirar, tarefa
 from unifi.api import ClienteUniFi, ErroApi, resumir_hosts
 
-from .models import Console
+from .models import ChaveUniFi, Console
 
 PRAZO_TESTE = 30           # segundos
 LIMITE_POR_MINUTO = 5      # testes por organização
@@ -88,29 +93,65 @@ def sincronizar_consoles(cliente, resumos, agora=None):
     return len(vistos), conectados
 
 
-@sensitive_variables()
-def testar_conexao(chave):
-    """Testa a chave de um cliente, atualiza os consoles e guarda o resultado na chave."""
+TIPO_TESTE = "testar_conexao"
+
+
+def pedir_teste(chave, usuario):
+    """Na requisição: confere o limite e enfileira. Devolve uma mensagem de erro ou ""."""
     if not reservar_teste(exigir_organizacao()):
         # Não conta como teste: nada é gravado na chave.
-        return Resultado(False, "limite_sistema", "Muitos testes seguidos. Espere um minuto e tente de novo.")
+        return "Muitos testes seguidos. Espere um minuto e tente de novo."
+    enfileirar(TIPO_TESTE, organizacao_id=chave.organizacao_id, cliente_id=chave.cliente_id,
+               exclusiva=f"{TIPO_TESTE}:{chave.cliente_id}", pedida_por_id=usuario.pk, max_tentativas=1)
+    chave.teste_pedido_em = timezone.now()
+    chave.save(update_fields=["teste_pedido_em"])
+    return ""
 
-    try:
-        hosts = criar_cliente_api(chave.abrir()).listar_hosts()
-    except ErroCofre as erro:
-        resultado = Resultado(False, "cofre", str(erro))
-    except ErroApi as erro:
-        resultado = Resultado(False, erro.codigo, erro.mensagem)
+
+@sensitive_variables()
+def executar_teste(organizacao_id, cliente_id, usuario_id=None):
+    """No trabalhador, fora de transação. Devolve o Resultado (ou None se a chave sumiu)."""
+    with contexto(organizacao_id=organizacao_id):
+        chave = ChaveUniFi.objects.filter(cliente_id=cliente_id).first()
+        if chave is None:
+            return None
+        try:
+            texto, erro_cofre = chave.abrir(), None
+        except ErroCofre as erro:
+            texto, erro_cofre = None, erro
+
+    hosts, resultado = None, None
+    if erro_cofre is not None:
+        resultado = Resultado(False, "cofre", str(erro_cofre))
     else:
-        total, conectados = sincronizar_consoles(chave.cliente, resumir_hosts(hosts))
-        if total == 0:
-            mensagem = "A chave funciona, mas a conta não tem nenhum console."
-        else:
-            mensagem = f"Conexão funcionou: {total} console(s), {conectados} conectado(s)."
-        resultado = Resultado(True, "ok", mensagem, total, conectados)
+        try:
+            hosts = criar_cliente_api(texto).listar_hosts()     # sem transação aberta
+        except ErroApi as erro:
+            resultado = Resultado(False, erro.codigo, erro.mensagem)
+    texto = None
 
-    chave.testada_em = timezone.now()
-    chave.teste_ok = resultado.ok
-    chave.teste_resultado = resultado.mensagem[:300]
-    chave.save(update_fields=["testada_em", "teste_ok", "teste_resultado"])
+    with contexto(organizacao_id=organizacao_id):
+        chave = ChaveUniFi.objects.select_related("cliente").filter(cliente_id=cliente_id).first()
+        if chave is None:   # apagada enquanto a UniFi respondia
+            return None
+        if resultado is None:
+            total, conectados = sincronizar_consoles(chave.cliente, resumir_hosts(hosts))
+            if total == 0:
+                mensagem = "A chave funciona, mas a conta não tem nenhum console."
+            else:
+                mensagem = f"Conexão funcionou: {total} console(s), {conectados} conectado(s)."
+            resultado = Resultado(True, "ok", mensagem, total, conectados)
+        chave.testada_em = timezone.now()
+        chave.teste_ok = resultado.ok
+        chave.teste_resultado = resultado.mensagem[:300]
+        chave.save(update_fields=["testada_em", "teste_ok", "teste_resultado"])
+        usuario = get_user_model().objects.filter(pk=usuario_id).first() if usuario_id else None
+        registrar(None, Acao.CONEXAO_TESTADA, usuario=usuario, cliente_id=chave.cliente_id,
+                  cliente=chave.cliente.nome, resultado=resultado.codigo, consoles=resultado.consoles,
+                  conectados=resultado.conectados)
     return resultado
+
+
+@tarefa(TIPO_TESTE)
+def testar_conexao(tarefa_):
+    executar_teste(tarefa_.organizacao_id, tarefa_.cliente_id, tarefa_.pedida_por_id)

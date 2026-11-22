@@ -6,6 +6,8 @@ Cada cliente tem no máximo uma chave Site Manager (unifi.ui.com). A chave fica 
 Toda tabela daqui leva organização e cliente: a organização para o isolamento entre MSPs
 (RLS), o cliente para o acesso só de leitura do cliente final, previsto para o futuro.
 """
+from datetime import timedelta
+
 from django.core.exceptions import PermissionDenied
 from django.db import models
 from django.utils import timezone
@@ -27,6 +29,7 @@ class ChaveUniFi(ModeloDaOrganizacao):
     final = models.CharField("últimos 4 caracteres", max_length=4, editable=False)
     cadastrada_em = models.DateTimeField("cadastrada em", default=timezone.now, editable=False)
     trocada_em = models.DateTimeField("trocada em", null=True, blank=True, editable=False)
+    teste_pedido_em = models.DateTimeField("teste pedido em", null=True, blank=True, editable=False)
     testada_em = models.DateTimeField("último teste em", null=True, blank=True, editable=False)
     teste_ok = models.BooleanField("último teste funcionou", null=True, editable=False)
     teste_resultado = models.CharField("resultado do último teste", max_length=300, blank=True, editable=False)
@@ -47,6 +50,13 @@ class ChaveUniFi(ModeloDaOrganizacao):
             self.trocada_em = timezone.now()
         self.chave_cifrada = cifrar(chave)
         self.final = ultimos4(chave)
+
+    @property
+    def teste_pendente(self):
+        # Pedido há mais de 10 min sem resposta: o trabalhador está desligado; a tela para de esperar.
+        if not self.teste_pedido_em or self.teste_pedido_em < timezone.now() - timedelta(minutes=10):
+            return False
+        return self.testada_em is None or self.testada_em < self.teste_pedido_em
 
     def abrir(self):
         """A chave em texto, só para chamar a UniFi. Nunca mostrar nem registrar."""

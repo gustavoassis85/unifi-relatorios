@@ -1,5 +1,6 @@
 import base64
-
+import re
+import unicodedata
 
 from organizacoes.isolamento import exigir_organizacao
 from organizacoes.models import Organizacao
@@ -22,3 +23,8 @@ def logo_embutido(marca):
     return "data:image/png;base64," + base64.b64encode(bytes(marca.logo)).decode("ascii")
 
 
+def nome_do_pdf(cliente, relatorio):
+    """Nome do arquivo do PDF (download e anexo do e-mail): só letras, números e hífens."""
+    base = unicodedata.normalize("NFKD", f"saude-da-rede-{cliente.nome}-{relatorio.rotulo}")
+    base = re.sub(r"[^A-Za-z0-9]+", "-", base.encode("ascii", "ignore").decode()).strip("-").lower()
+    return f"{base[:100] or 'relatorio'}.pdf"

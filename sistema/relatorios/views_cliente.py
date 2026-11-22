@@ -1,6 +1,4 @@
 """Relatórios na página do cliente: gerar, histórico, ver e baixar o PDF."""
-import re
-import unicodedata
 from datetime import timedelta
 
 from django.contrib import messages
@@ -17,6 +15,7 @@ from organizacoes.permissoes import exige
 
 from .models import Relatorio, SituacaoRelatorio
 from .periodos import PeriodoInvalido, opcoes, resolver
+from .servicos import nome_do_pdf
 from .tarefas import enfileirar_relatorio
 
 # O HTML do relatório tem estilos embutidos e nenhum script: esta CSP só libera isso.
@@ -34,19 +33,44 @@ def _encerrar_travados(cliente):
         situacao=SituacaoRelatorio.FALHOU, erro="A geração não terminou (o trabalhador parou no meio). Peça de novo.")
 
 
+ENVIO_PENDENTE_NO_MAXIMO = timedelta(hours=3)   # 3 tentativas: na hora, 10 min e 1 h
+
+
+def _encerrar_envios_travados(cliente):
+    from envios.models import Envio, SituacaoEnvio
+
+    limite = timezone.now() - ENVIO_PENDENTE_NO_MAXIMO
+    Envio.objects.filter(cliente=cliente, situacao=SituacaoEnvio.PENDENTE, criado_em__lt=limite).update(
+        situacao=SituacaoEnvio.FALHOU, motivo="O envio não terminou (o trabalhador parou no meio). Use \"Reenviar\".")
+
+
 def historico(cliente):
-    """Os relatórios mais recentes do cliente, sem carregar HTML e PDF (são grandes)."""
-    return list(Relatorio.objects.filter(cliente=cliente).defer("html", "pdf").select_related("pedido_por")[:HISTORICO])
+    """Os relatórios mais recentes do cliente, sem carregar HTML e PDF (são grandes), cada um
+    com o último envio por e-mail em .envio (ou None)."""
+    from envios.models import Envio
+
+    relatorios = list(Relatorio.objects.filter(cliente=cliente).defer("html", "pdf")
+                      .select_related("pedido_por")[:HISTORICO])
+    ultimos = {}
+    for envio in Envio.objects.filter(relatorio__in=relatorios).order_by("criado_em"):
+        ultimos[envio.relatorio_id] = envio
+    for r in relatorios:
+        r.envio = ultimos.get(r.pk)
+    return relatorios
 
 
 def contexto_relatorios(cliente):
     _encerrar_travados(cliente)
+    _encerrar_envios_travados(cliente)
     relatorios = historico(cliente)
     ultimo_pronto = (Relatorio.objects.filter(cliente=cliente, situacao=SituacaoRelatorio.PRONTO)
                      .only("higiene", "pronto_em", "rotulo").first())
     return {
         "relatorios": relatorios,
-        "gerando": any(r.situacao == SituacaoRelatorio.GERANDO for r in relatorios),
+        # A tela se atualiza sozinha enquanto gera ou enquanto a 1ª tentativa de envio não terminou.
+        "gerando": any(r.situacao == SituacaoRelatorio.GERANDO
+                       or (r.envio and r.envio.situacao == "pendente" and r.envio.tentativas == 0)
+                       for r in relatorios),
         "opcoes_periodo": opcoes(),
         "higiene": ultimo_pronto.higiene if ultimo_pronto else [],
         "higiene_de": ultimo_pronto,
@@ -103,18 +127,12 @@ def ver(request, pk, relatorio_pk):
     return resposta
 
 
-def _nome_arquivo(cliente, relatorio):
-    base = unicodedata.normalize("NFKD", f"saude-da-rede-{cliente.nome}-{relatorio.rotulo}")
-    base = re.sub(r"[^A-Za-z0-9]+", "-", base.encode("ascii", "ignore").decode()).strip("-").lower()
-    return f"{base[:100] or 'relatorio'}.pdf"
-
-
 @exige(papeis.pode_ver_clientes)
 def baixar(request, pk, relatorio_pk):
     cliente, relatorio = _relatorio_pronto(pk, relatorio_pk)
     resposta = HttpResponse(bytes(relatorio.pdf), content_type="application/pdf")
     resposta["Cache-Control"] = SEM_CACHE
-    resposta["Content-Disposition"] = f'attachment; filename="{_nome_arquivo(cliente, relatorio)}"'
+    resposta["Content-Disposition"] = f'attachment; filename="{nome_do_pdf(cliente, relatorio)}"'
     registrar(request, Acao.RELATORIO_BAIXADO, cliente_id=cliente.pk, cliente=cliente.nome,
               relatorio_id=relatorio.pk, periodo=relatorio.rotulo)
     return resposta

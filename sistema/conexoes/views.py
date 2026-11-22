@@ -65,27 +65,33 @@ def apagar(request, pk):
 @exige(papeis.pode_testar_conexao)
 @require_http_methods(["POST"])
 def testar(request, pk):
-    from .servicos import testar_conexao
+    from .servicos import pedir_teste
 
     cliente = get_object_or_404(Cliente.objects, pk=pk)
     chave = chave_do_cliente(cliente)
     if chave is None:
         messages.error(request, "Cadastre a chave da UniFi antes de testar.")
         return redirect("clientes:detalhe", pk=cliente.pk)
-
-    resultado = testar_conexao(chave)
-    if resultado.codigo != "limite_sistema":
-        registrar(
-            request,
-            Acao.CONEXAO_TESTADA,
-            cliente_id=cliente.pk,
-            cliente=cliente.nome,
-            resultado=resultado.codigo,
-            consoles=resultado.consoles,
-            conectados=resultado.conectados,
-        )
-    (messages.success if resultado.ok else messages.error)(request, resultado.mensagem)
+    erro = pedir_teste(chave, request.user)
+    if erro:
+        messages.error(request, erro)
     return redirect("clientes:detalhe", pk=cliente.pk)
+
+
+@exige(papeis.pode_ver_clientes)
+@require_http_methods(["GET"])
+def situacao_teste(request, pk):
+    """Pedaço "Último teste" (a página consulta enquanto o teste roda). Ao terminar, recarrega a
+    página inteira, porque a lista de consoles também mudou."""
+    from django.http import HttpResponse
+
+    cliente = get_object_or_404(Cliente.objects, pk=pk)
+    chave = chave_do_cliente(cliente)
+    if chave is None or not chave.teste_pendente:
+        resposta = HttpResponse(status=204)
+        resposta["HX-Refresh"] = "true"
+        return resposta
+    return render(request, "conexoes/_teste.html", {"cliente": cliente, "chave": chave})
 
 
 @exige(papeis.pode_testar_conexao)

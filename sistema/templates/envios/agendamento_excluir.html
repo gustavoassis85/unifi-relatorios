@@ -1,0 +1,13 @@
+{% extends "base.html" %}
+{% block head_title %}Excluir agendamento — {{ cliente.nome }}{% endblock %}
+{% block content %}
+  <h1>Excluir o agendamento de {{ cliente.nome }}?</h1>
+  <p>O agendamento "{{ agendamento.descricao }}" deixa de gerar e enviar relatórios. Os relatórios já gerados continuam no histórico. Para só parar por um tempo, use "Pausar".</p>
+  <form method="post">
+    {% csrf_token %}
+    <div class="botoes">
+      <button type="submit" class="perigo">Excluir o agendamento</button>
+      <a href="{% url 'clientes:detalhe' cliente.pk %}">Cancelar</a>
+    </div>
+  </form>
+{% endblock %}

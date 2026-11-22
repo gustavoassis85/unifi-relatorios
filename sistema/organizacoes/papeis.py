@@ -34,6 +34,16 @@ def pode_editar_marca(papel):
     return papel == Papel.ADMIN
 
 
+def pode_configurar_smtp(papel):
+    """Servidor de e-mail da organização (inclui a senha)."""
+    return papel == Papel.ADMIN
+
+
+def pode_agendar(papel):
+    """Criar, editar, pausar e excluir agendamentos de relatório; reenviar relatórios."""
+    return papel in (Papel.ADMIN, Papel.OPERADOR)
+
+
 def pode_gerar_relatorio(papel):
     return papel in (Papel.ADMIN, Papel.OPERADOR)
 

@@ -1,0 +1,11 @@
+<div id="teste-smtp"{% if config.teste_pendente %} hx-get="{% url 'envios:situacao_teste' %}" hx-trigger="every 2s" hx-swap="outerHTML"{% endif %}>
+  {% if config.teste_pendente %}
+    <p>Enviando o e-mail de teste…</p>
+  {% elif config.testado_em %}
+    <p>Último teste em {{ config.testado_em|date:"d/m/Y H:i" }}:
+      {% if config.teste_ok %}<span class="ok">{{ config.teste_resultado }}</span>{% else %}<span class="falha">{{ config.teste_resultado }}</span>{% endif %}
+    </p>
+  {% else %}
+    <p class="nota">Nenhum teste feito ainda.</p>
+  {% endif %}
+</div>

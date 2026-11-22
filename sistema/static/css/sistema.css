@@ -100,6 +100,7 @@ code { font-family: ui-monospace, Consolas, monospace; font-size: 13px; }
 .botoes form { margin: 0; }
 .mensagens li.error { border-color: var(--perigo); color: var(--perigo); }
 td.acoes form { display: inline; margin-left: 16px; }
+td.acoes form + a { margin-left: 16px; }
 table.partes { margin-bottom: 16px; }
 table.partes td:first-child { white-space: nowrap; }
 .previa-logo img { max-width: 300px; max-height: 100px; display: block; }

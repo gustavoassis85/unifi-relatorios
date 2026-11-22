@@ -100,7 +100,7 @@ As coletas rodam num segundo processo, o trabalhador. Abra outro PowerShell (ou 
 .\.venv\Scripts\python.exe manage.py trabalhador
 ```
 
-Deixe as duas janelas abertas: uma com o site, outra com o trabalhador. Ele coleta todos os clientes no minuto 30 de cada hora, roda os pedidos de "Coletar agora" e de relatório e, às 3h15 e às 4h, limpa tarefas antigas e dados que passaram do prazo. Se ficar desligado, a coleta roda uma vez assim que ele voltar. Para parar: `Ctrl+C` (ele termina a coleta em andamento antes de sair).
+Deixe as duas janelas abertas: uma com o site, outra com o trabalhador. Ele coleta todos os clientes no minuto 30 de cada hora, dispara os relatórios agendados no minuto 1 de cada hora e manda os e-mails, roda os pedidos de "Coletar agora", "Testar conexão", "Enviar teste" e de relatório e, às 3h15 e às 4h, limpa tarefas antigas e dados que passaram do prazo. Se ficar desligado, a coleta roda uma vez assim que ele voltar. Para parar: `Ctrl+C` (ele termina a coleta em andamento antes de sair).
 
 Para ver os números coletados de um cliente (o número é o que aparece no endereço da página dele, por exemplo `/clientes/3/`):
 
@@ -163,6 +163,21 @@ Precisa de uma chave Site Manager: em unifi.ui.com, menu API, gere uma chave (ou
 6. Entre como o usuário de leitura: vê e baixa os relatórios, mas não tem o botão "Gerar relatório" nem o menu Marca.
 7. Entre como admin do outro MSP: nenhum relatório do cliente do lab aparece.
 
+### Validação da etapa 5 (agendamentos e e-mail)
+
+Precisa de uma conta de e-mail com SMTP. No Gmail: ative a verificação em duas etapas e crie uma "senha de app" (Conta Google > Segurança > Senhas de app). Servidor `smtp.gmail.com`, porta 587, STARTTLS, usuário = o e-mail, senha = a senha de app, remetente = o mesmo e-mail.
+
+1. Suba o site e o trabalhador (seção 3). Se o trabalhador roda pelo Agendador de Tarefas, reinicie a tarefa "Dashboard UniFi - Trabalhador" depois de atualizar o código.
+2. Como admin, abra o menu E-mail, preencha e salve. A senha some da tela; fica só "termina em" com os 4 últimos caracteres.
+3. Clique em "Enviar teste": aparece "Enviando o e-mail de teste…" e, em segundos, o resultado. Confira a caixa de entrada do seu usuário. Troque a senha por uma errada e teste de novo: deve aparecer "O servidor de e-mail recusou o usuário ou a senha." Volte a senha certa.
+4. Tente salvar `localhost` ou `192.168.1.1` como servidor: deve ser recusado.
+5. Na página do cliente do lab, em Agendamentos, crie um agendamento semanal para hoje, na próxima hora cheia, com o seu e-mail como destinatário. Depois da hora cheia (no minuto 1), o relatório aparece no histórico com "Agendamento" e, quando fica pronto, "Enviado em … para 1 destinatário". O e-mail chega com o PDF anexado.
+6. Clique em "Reenviar" no relatório: chega outro e-mail.
+7. No menu E-mail, desmarque "enviar e-mails por este servidor" e clique em "Reenviar": aparece "Não enviado: o servidor de e-mail está desligado". Marque de novo.
+8. Clique em "Testar conexão" na página do cliente: aparece "Testando a conexão com a UniFi…" e a página recarrega sozinha com o resultado.
+9. Entre como o usuário de leitura: vê os agendamentos, mas não cria, não edita, não pausa e não reenvia; não tem o menu E-mail. Entre como admin do outro MSP: nenhum agendamento ou envio do lab aparece.
+10. Pause o agendamento criado no passo 5 (ou exclua) para não receber e-mails toda semana.
+
 ## 6. Troca da chave mestra
 
 Para trocar a `UNIFI_CHAVE_MESTRA` (por exemplo, se o `.env` vazou), com o sistema parado:
@@ -195,6 +210,7 @@ sistema/
   tarefas/            fila de tarefas no PostgreSQL, tarefas periódicas e o comando trabalhador
   coletas/            coletas portadas do MVP, dados coletados, retenção e resumo_cliente
   relatorios/         marca da organização, pontos de atenção, relatório HTML (portado do MVP), PDF e telas
+  envios/             SMTP da organização, agendamentos, disparo e envio dos relatórios por e-mail
   .navegadores/       Chromium sem tela do Playwright (fora do Git)
   templates/, static/ telas e CSS/HTMX
 ```
@@ -223,3 +239,9 @@ sistema/
 - Página do relatório com CSP própria: só estilos e imagens embutidos, nenhum script; sem cache no navegador (também no PDF). Todo texto vindo da UniFi ou do MSP é escapado. O nome do arquivo baixado só tem letras sem acento, números e hífen.
 - Logo da marca: só admin envia; PNG ou JPG conferido pelo conteúdo, até 500 KB, limite de pixels contra imagem "bomba", e regravado como PNG novo (descarta metadados e conteúdo escondido). SVG não é aceito.
 - Higiene da conta (registros antigos e consoles fora do acompanhamento) aparece só na tela do MSP, nunca no relatório do cliente.
+- SMTP por organização: só o admin configura. Senha cifrada no cofre (como as chaves da UniFi), nunca volta para a tela (só os 4 últimos caracteres) e fica fora da auditoria e das páginas de erro. Sem criptografia não é aceito (STARTTLS ou SSL), o certificado é conferido pelo nome do servidor e cada conexão tem 20 s de limite. Portas aceitas: 25, 465, 587 e 2525.
+- O servidor de e-mail não pode apontar para a rede interna (`envios/rede.py`): o nome é resolvido, todos os IPs têm de ser da Internet e a conexão vai para o IP conferido (uma segunda consulta ao DNS não consegue trocar o destino). Assim, no servidor, o campo do SMTP não serve para sondar a rede de lá.
+- Agendamentos e envios: organização e cliente sob RLS, e o banco garante que batem. Admin e operador criam, editam, pausam, excluem e reenviam; leitura só vê. No máximo 5 agendamentos por cliente, 10 destinatários e 5 envios por relatório a cada 24 horas.
+- Os e-mails dos destinatários são dados pessoais informados pelo MSP: ficam só no agendamento e no registro do envio (apagado com o relatório, em 13 meses). Não vão para o log, para a fila de tarefas nem para a auditoria (lá só a quantidade).
+- Envio: falha passageira tenta de novo (10 min e 1 h depois); falha que pede correção (senha, remetente, certificado) para na hora. Envio que não termina em 3 horas vira falha e libera o "Reenviar". Sem SMTP, o agendamento só gera o relatório (plano B).
+- "Testar conexão" e "Enviar teste" rodam no trabalhador: a consulta à UniFi e a conversa com o servidor de e-mail nunca seguram uma transação do banco. Se o trabalhador estiver desligado, a tela para de esperar depois de 10 minutos.
