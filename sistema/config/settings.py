@@ -72,6 +72,8 @@ INSTALLED_APPS = [
     "cofre",
     "unifi",
     "conexoes",
+    "tarefas",
+    "coletas",
 ]
 
 MIDDLEWARE = [
