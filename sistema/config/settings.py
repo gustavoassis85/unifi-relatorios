@@ -70,6 +70,7 @@ INSTALLED_APPS = [
     "clientes",
     "auditoria",
     "cofre",
+    "unifi",
 ]
 
 MIDDLEWARE = [
