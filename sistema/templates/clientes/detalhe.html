@@ -42,11 +42,44 @@
     {% endif %}
   </section>
 
+  {% if chave %}
+  <section class="bloco">
+    <h2>Coletas</h2>
+    {% if coleta_pendente %}
+      <p class="nota">{% if coleta_pendente.situacao == "rodando" %}Coleta rodando agora.{% else %}Coleta na fila desde {{ coleta_pendente.criada_em|date:"d/m/Y H:i" }}.{% endif %}</p>
+    {% endif %}
+    {% if ultima_execucao %}
+      <dl class="dados">
+        <dt>Última coleta</dt>
+        <dd>{{ ultima_execucao.iniciada_em|date:"d/m/Y H:i" }} · {% if ultima_execucao.automatica %}automática{% else %}pedida na tela{% endif %} ·
+          <span class="{% if ultima_execucao.resultado == 'ok' %}ok{% elif ultima_execucao.resultado != 'rodando' %}falha{% endif %}">{{ ultima_execucao.get_resultado_display }}</span></dd>
+      </dl>
+      {% if ultima_execucao.partes %}
+        <table class="partes">
+          <tbody>
+            {% for p in ultima_execucao.partes %}
+              <tr><td>{{ p.nome }}</td><td class="{% if p.ok %}ok{% else %}falha{% endif %}">{% if p.ok %}OK{% else %}Falhou{% endif %}</td><td>{{ p.mensagem }}</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      {% endif %}
+    {% else %}
+      <p class="vazio">Nenhuma coleta ainda. As coletas rodam sozinhas no minuto 30 de cada hora, com o trabalhador ligado.</p>
+    {% endif %}
+    {% if pode_testar_conexao %}
+      <form method="post" action="{% url 'coletas:coletar_agora' cliente.pk %}" hx-disabled-elt="find button">
+        {% csrf_token %}
+        <button type="submit">Coletar agora</button>
+      </form>
+    {% endif %}
+  </section>
+  {% endif %}
+
   <section class="bloco">
     <h2>Consoles</h2>
     {% if consoles %}
       <table>
-        <thead><tr><th>Nome</th><th>Modelo</th><th>Situação</th><th>Network</th><th>Acompanhar</th></tr></thead>
+        <thead><tr><th>Nome</th><th>Modelo</th><th>Situação</th><th>Network</th><th>Última coleta</th><th>Acompanhar</th></tr></thead>
         <tbody>
           {% for console in consoles %}
             <tr>
@@ -54,6 +87,7 @@
               <td>{{ console.modelo|default:"—" }}</td>
               <td>{{ console.situacao }}</td>
               <td>{{ console.versao_network|default:"—" }}</td>
+              <td>{{ console.ultima_coleta|date:"d/m H:i"|default:"—" }}</td>
               <td class="acoes">
                 {{ console.acompanhar|yesno:"Sim,Não" }}
                 {% if pode_testar_conexao %}
