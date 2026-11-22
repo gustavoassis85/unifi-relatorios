@@ -28,6 +28,7 @@ def detalhe(request, pk):
     from conexoes.models import Console
 
     from coletas.painel import situacao_das_coletas
+    from envios.views_cliente import contexto_agendamentos
     from relatorios.views_cliente import contexto_relatorios
 
     cliente = _cliente_da_organizacao(pk)
@@ -38,6 +39,7 @@ def detalhe(request, pk):
         "consoles": consoles,
         **situacao_das_coletas(cliente, consoles),
         **contexto_relatorios(cliente),
+        **contexto_agendamentos(cliente),
     }
     return render(request, "clientes/detalhe.html", contexto)
 

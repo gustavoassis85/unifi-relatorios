@@ -19,6 +19,7 @@ urlpatterns = [
     path("clientes/", include("conexoes.urls")),
     path("clientes/", include("coletas.urls")),
     path("clientes/", include("relatorios.urls_cliente")),
+    path("clientes/", include("envios.urls_cliente")),
     path("usuarios/", include("organizacoes.urls")),
     path("relatorios/", include("relatorios.urls")),
     path("organizacao/", include("envios.urls")),

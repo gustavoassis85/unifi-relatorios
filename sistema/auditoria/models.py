@@ -28,6 +28,11 @@ class Acao(models.TextChoices):
     RELATORIO_BAIXADO = "relatorio_baixado", "PDF do relatório baixado"
     SMTP_ALTERADO = "smtp_alterado", "Servidor de e-mail alterado"
     SMTP_TESTADO = "smtp_testado", "Teste do servidor de e-mail pedido"
+    AGENDAMENTO_CRIADO = "agendamento_criado", "Agendamento criado"
+    AGENDAMENTO_ALTERADO = "agendamento_alterado", "Agendamento alterado"
+    AGENDAMENTO_PAUSADO = "agendamento_pausado", "Agendamento pausado"
+    AGENDAMENTO_RETOMADO = "agendamento_retomado", "Agendamento retomado"
+    AGENDAMENTO_EXCLUIDO = "agendamento_excluido", "Agendamento excluído"
     ORGANIZACAO_CRIADA = "organizacao_criada", "Organização criada"
     ORGANIZACAO_ALTERADA = "organizacao_alterada", "Organização alterada"
 

@@ -1,0 +1,37 @@
+<section class="bloco">
+  <div class="cabecalho">
+    <h2>Agendamentos</h2>
+    {% if pode_agendar and agendamentos|length < 5 %}<a href="{% url 'envios_cliente:novo' cliente.pk %}">Novo agendamento</a>{% endif %}
+  </div>
+  {% if not smtp_ativo %}
+    <p class="nota">Sem servidor de e-mail ativo: os agendamentos geram o relatório e deixam no histórico, sem enviar.{% if pode_configurar_smtp %} <a href="{% url 'envios:smtp' %}">Configurar o e-mail</a>.{% endif %}</p>
+  {% endif %}
+  {% if agendamentos %}
+    <table>
+      <thead><tr><th>Quando</th><th>Próxima execução</th><th>Destinatários</th><th>Situação</th><th></th></tr></thead>
+      <tbody>
+        {% for a in agendamentos %}
+          <tr>
+            <td>{{ a.descricao }}<br><small class="nota">{{ a.get_frequencia_display }}</small></td>
+            <td>{% if a.ativo and a.proxima_execucao %}{{ a.proxima_execucao|date:"d/m/Y H:i" }}{% else %}—{% endif %}</td>
+            <td>{% for e in a.destinatarios %}{{ e }}{% if not forloop.last %}<br>{% endif %}{% empty %}<span class="nota">Nenhum (só gera)</span>{% endfor %}</td>
+            <td>{% if a.ativo %}<span class="ok">Ativo</span>{% else %}Pausado{% endif %}</td>
+            <td class="acoes">
+              {% if pode_agendar %}
+                <a href="{% url 'envios_cliente:editar' cliente.pk a.pk %}">Editar</a>
+                <form method="post" action="{% url 'envios_cliente:pausar' cliente.pk a.pk %}" class="inline">
+                  {% csrf_token %}
+                  <input type="hidden" name="ativo" value="{% if a.ativo %}0{% else %}1{% endif %}">
+                  <button type="submit" class="link">{% if a.ativo %}Pausar{% else %}Retomar{% endif %}</button>
+                </form>
+                <a href="{% url 'envios_cliente:excluir' cliente.pk a.pk %}">Excluir</a>
+              {% endif %}
+            </td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  {% else %}
+    <p class="vazio">Nenhum agendamento. {% if pode_agendar %}Crie um para o relatório sair sozinho todo mês ou toda semana.{% endif %}</p>
+  {% endif %}
+</section>
