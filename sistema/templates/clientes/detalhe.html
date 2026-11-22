@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+{% block head_title %}{{ cliente.nome }}{% endblock %}
+{% block content %}
+  <div class="cabecalho">
+    <h1>{{ cliente.nome }}</h1>
+    {% if pode_editar_clientes %}<a href="{% url 'clientes:editar' cliente.pk %}">Editar nome</a>{% endif %}
+  </div>
+
+  <section class="bloco">
+    <h2>Conexão com a UniFi</h2>
+    {% if chave %}
+      <dl class="dados">
+        <dt>Chave da API</dt><dd>terminada em <code>{{ chave.final|default:"····" }}</code></dd>
+        <dt>Cadastrada em</dt><dd>{{ chave.cadastrada_em|date:"d/m/Y H:i" }}</dd>
+        {% if chave.trocada_em %}<dt>Trocada em</dt><dd>{{ chave.trocada_em|date:"d/m/Y H:i" }}</dd>{% endif %}
+      </dl>
+      {% if pode_gerenciar_chaves %}
+        <div class="botoes">
+          <a href="{% url 'conexoes:chave' cliente.pk %}">Trocar chave</a>
+          <a href="{% url 'conexoes:chave_apagar' cliente.pk %}">Apagar chave</a>
+        </div>
+      {% endif %}
+    {% else %}
+      <p class="vazio">Nenhuma chave da UniFi cadastrada para este cliente.
+        {% if pode_gerenciar_chaves %}<a href="{% url 'conexoes:chave' cliente.pk %}">Cadastrar chave</a>.
+        {% else %}Peça a um admin da organização para cadastrar.{% endif %}</p>
+    {% endif %}
+  </section>
+
+  <p><a href="{% url 'clientes:lista' %}">Voltar para clientes</a></p>
+{% endblock %}

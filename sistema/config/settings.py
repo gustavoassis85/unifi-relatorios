@@ -71,6 +71,7 @@ INSTALLED_APPS = [
     "auditoria",
     "cofre",
     "unifi",
+    "conexoes",
 ]
 
 MIDDLEWARE = [

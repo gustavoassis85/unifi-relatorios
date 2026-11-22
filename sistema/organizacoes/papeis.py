@@ -19,5 +19,10 @@ def pode_gerenciar_usuarios(papel):
     return papel == Papel.ADMIN
 
 
+def pode_gerenciar_chaves(papel):
+    """Cadastrar, trocar e apagar a chave da UniFi de um cliente."""
+    return papel == Papel.ADMIN
+
+
 def exige_mfa(papel):
     return papel == Papel.ADMIN

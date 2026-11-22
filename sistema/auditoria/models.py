@@ -16,6 +16,9 @@ class Acao(models.TextChoices):
     CLIENTE_CRIADO = "cliente_criado", "Cliente criado"
     CLIENTE_ALTERADO = "cliente_alterado", "Cliente alterado"
     CLIENTE_APAGADO = "cliente_apagado", "Cliente apagado"
+    CHAVE_CADASTRADA = "chave_cadastrada", "Chave da UniFi cadastrada"
+    CHAVE_TROCADA = "chave_trocada", "Chave da UniFi trocada"
+    CHAVE_APAGADA = "chave_apagada", "Chave da UniFi apagada"
     ORGANIZACAO_CRIADA = "organizacao_criada", "Organização criada"
     ORGANIZACAO_ALTERADA = "organizacao_alterada", "Organização alterada"
 

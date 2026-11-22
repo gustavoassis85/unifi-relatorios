@@ -51,3 +51,18 @@ def rls_vinculo(tabela):
         ],
         reverse_sql=_desativar(tabela, ["ver", "incluir", "alterar", "apagar"]),
     )
+
+
+def cliente_da_mesma_organizacao(tabela):
+    """Tabela que pertence a um cliente: chave estrangeira composta (organização, cliente)
+    para clientes_cliente. O banco recusa apontar para cliente de outra organização."""
+    restricao = f"{tabela}_cliente_mesma_org"
+    return migrations.RunSQL(
+        sql=[
+            f"alter table {tabela} add constraint {restricao} "
+            f"foreign key (organizacao_id, cliente_id) "
+            f"references clientes_cliente (organizacao_id, id) "
+            f"deferrable initially deferred"
+        ],
+        reverse_sql=[f"alter table {tabela} drop constraint if exists {restricao}"],
+    )

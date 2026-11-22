@@ -88,3 +88,10 @@ div.erro { margin-bottom: 16px; }
 .mensagens li.success { border-color: var(--sucesso); color: var(--sucesso); }
 
 .vazio, .nota { color: var(--suave); }
+
+.bloco { border: 1px solid var(--borda); border-radius: 4px; padding: 16px; margin-bottom: 24px; }
+h2 { font-size: 16px; font-weight: 600; margin: 0 0 12px; }
+.dados { display: grid; grid-template-columns: max-content 1fr; gap: 4px 16px; margin: 0 0 16px; }
+.dados dt { color: var(--suave); }
+.dados dd { margin: 0; }
+code { font-family: ui-monospace, Consolas, monospace; font-size: 13px; }

@@ -11,7 +11,7 @@
       <tbody>
         {% for cliente in clientes %}
           <tr>
-            <td>{{ cliente.nome }}</td>
+            <td><a href="{% url 'clientes:detalhe' cliente.pk %}">{{ cliente.nome }}</a></td>
             <td>{{ cliente.criado_em|date:"d/m/Y" }}</td>
             {% if pode_editar_clientes %}
               <td class="acoes">
