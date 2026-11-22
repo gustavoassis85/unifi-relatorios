@@ -33,6 +33,13 @@ idna==3.20
 certifi==2026.11.20
 charset-normalizer==3.5.2
 
+# Relatório: validação e redução do logo da marca
+pillow==13.0.0
+
+# PDF do relatório no servidor (Chromium sem tela, instalado em .navegadores/)
+playwright==1.65.2
+greenlet==3.5.6
+
 # Testes
 pytest==9.2.0
 pytest-django==4.14.0

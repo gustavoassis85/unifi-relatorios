@@ -5,3 +5,4 @@ __pycache__/
 *.pyc
 staticfiles/
 .pytest_cache/
+.navegadores/

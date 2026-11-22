@@ -76,6 +76,31 @@
   {% endif %}
 
   <section class="bloco">
+    <h2>Relatórios</h2>
+    {% if pode_gerar_relatorio %}
+      <form method="post" action="{% url 'relatorios_cliente:gerar' cliente.pk %}" class="linha-form" hx-disabled-elt="find button">
+        {% csrf_token %}
+        <label for="periodo">Período</label>
+        <select name="periodo" id="periodo">
+          {% for valor, rotulo in opcoes_periodo %}<option value="{{ valor }}">{{ rotulo }}</option>{% endfor %}
+        </select>
+        <button type="submit">Gerar relatório</button>
+      </form>
+    {% endif %}
+    {% include "relatorios/_historico.html" %}
+  </section>
+
+  {% if higiene %}
+  <section class="bloco">
+    <h2>Higiene da conta</h2>
+    <p class="nota">Só você vê esta lista: ela não entra no relatório do cliente. Do relatório de {{ higiene_de.rotulo|lower }}, gerado em {{ higiene_de.pronto_em|date:"d/m/Y H:i" }}.</p>
+    <ul class="higiene">
+      {% for item in higiene %}<li><strong>{{ item.titulo }}</strong> — {{ item.evidencia }}</li>{% endfor %}
+    </ul>
+  </section>
+  {% endif %}
+
+  <section class="bloco">
     <h2>Consoles</h2>
     {% if consoles %}
       <table>

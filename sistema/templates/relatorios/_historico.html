@@ -1,0 +1,27 @@
+<div id="historico-relatorios"{% if gerando %} hx-get="{% url 'relatorios_cliente:lista' cliente.pk %}" hx-trigger="every 3s" hx-swap="outerHTML"{% endif %}>
+  {% if relatorios %}
+    <table>
+      <thead><tr><th>Período</th><th>Pedido por</th><th>Pedido em</th><th>Situação</th><th></th></tr></thead>
+      <tbody>
+        {% for r in relatorios %}
+          <tr>
+            <td>{{ r.rotulo }}</td>
+            <td>{% if r.pedido_por %}{{ r.pedido_por.nome|default:r.pedido_por.email }}{% else %}—{% endif %}</td>
+            <td>{{ r.pedido_em|date:"d/m/Y H:i" }}</td>
+            <td>{% if r.situacao == "pronto" %}<span class="ok">Pronto</span>{% elif r.situacao == "falhou" %}<span class="falha" title="{{ r.erro }}">Falhou</span>{% else %}Gerando…{% endif %}</td>
+            <td class="acoes">
+              {% if r.situacao == "pronto" %}
+                <a href="{% url 'relatorios_cliente:ver' cliente.pk r.pk %}" target="_blank" rel="noopener">Ver</a>
+                <a href="{% url 'relatorios_cliente:baixar' cliente.pk r.pk %}" hx-boost="false">Baixar PDF</a>
+              {% elif r.situacao == "falhou" %}
+                <span class="nota">{{ r.erro }}</span>
+              {% endif %}
+            </td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  {% else %}
+    <p class="vazio">Nenhum relatório gerado ainda.</p>
+  {% endif %}
+</div>

@@ -29,5 +29,14 @@ def pode_testar_conexao(papel):
     return papel in (Papel.ADMIN, Papel.OPERADOR)
 
 
+def pode_editar_marca(papel):
+    """Nome, contato, logo e tema dos relatórios da organização."""
+    return papel == Papel.ADMIN
+
+
+def pode_gerar_relatorio(papel):
+    return papel in (Papel.ADMIN, Papel.OPERADOR)
+
+
 def exige_mfa(papel):
     return papel == Papel.ADMIN

@@ -102,3 +102,8 @@ code { font-family: ui-monospace, Consolas, monospace; font-size: 13px; }
 td.acoes form { display: inline; margin-left: 16px; }
 table.partes { margin-bottom: 16px; }
 table.partes td:first-child { white-space: nowrap; }
+.previa-logo img { max-width: 300px; max-height: 100px; display: block; }
+.linha-form { display: flex; gap: 12px; align-items: center; margin-bottom: 16px; flex-wrap: wrap; }
+.linha-form label { font-weight: 500; }
+ul.higiene { margin: 0; padding-left: 20px; }
+ul.higiene li + li { margin-top: 8px; }

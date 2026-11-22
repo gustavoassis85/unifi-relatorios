@@ -20,6 +20,7 @@
           <span class="organizacao">{{ vinculo.organizacao.nome }}</span>
           <a href="{% url 'clientes:lista' %}">Clientes</a>
           {% if pode_gerenciar_usuarios %}<a href="{% url 'usuarios:lista' %}">Usuários</a>{% endif %}
+          {% if pode_editar_marca %}<a href="{% url 'relatorios:marca' %}">Marca</a>{% endif %}
         </nav>
       {% endif %}
       <div class="conta">

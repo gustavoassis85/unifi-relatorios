@@ -74,6 +74,7 @@ INSTALLED_APPS = [
     "conexoes",
     "tarefas",
     "coletas",
+    "relatorios",
 ]
 
 MIDDLEWARE = [
