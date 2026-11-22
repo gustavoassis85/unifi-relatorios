@@ -33,6 +33,17 @@ def _encerrar_travados(cliente):
         situacao=SituacaoRelatorio.FALHOU, erro="A geração não terminou (o trabalhador parou no meio). Peça de novo.")
 
 
+ENVIO_PENDENTE_NO_MAXIMO = timedelta(hours=3)   # 3 tentativas: na hora, 10 min e 1 h
+
+
+def _encerrar_envios_travados(cliente):
+    from envios.models import Envio, SituacaoEnvio
+
+    limite = timezone.now() - ENVIO_PENDENTE_NO_MAXIMO
+    Envio.objects.filter(cliente=cliente, situacao=SituacaoEnvio.PENDENTE, criado_em__lt=limite).update(
+        situacao=SituacaoEnvio.FALHOU, motivo="O envio não terminou (o trabalhador parou no meio). Use \"Reenviar\".")
+
+
 def historico(cliente):
     """Os relatórios mais recentes do cliente, sem carregar HTML e PDF (são grandes), cada um
     com o último envio por e-mail em .envio (ou None)."""
@@ -50,6 +61,7 @@ def historico(cliente):
 
 def contexto_relatorios(cliente):
     _encerrar_travados(cliente)
+    _encerrar_envios_travados(cliente)
     relatorios = historico(cliente)
     ultimo_pronto = (Relatorio.objects.filter(cliente=cliente, situacao=SituacaoRelatorio.PRONTO)
                      .only("higiene", "pronto_em", "rotulo").first())

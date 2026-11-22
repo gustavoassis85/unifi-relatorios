@@ -1,6 +1,7 @@
 from django.contrib import messages
 from django.shortcuts import redirect, render
 from django.utils import timezone
+from django.views.decorators.debug import sensitive_post_parameters
 from django.views.decorators.http import require_http_methods
 
 from auditoria.models import Acao
@@ -17,6 +18,7 @@ def _config():
     return ConfigSmtp.objects.first()
 
 
+@sensitive_post_parameters("senha")
 @exige(papeis.pode_configurar_smtp)
 @require_http_methods(["GET", "POST"])
 def smtp(request):
@@ -27,7 +29,7 @@ def smtp(request):
         salvo.atualizado_em = timezone.now()
         salvo.save()
         registrar(request, Acao.SMTP_ALTERADO, servidor=salvo.servidor, porta=salvo.porta,
-                  seguranca=salvo.seguranca, ativo=salvo.ativo, senha_trocada=form.senha_trocada)
+                  seguranca=salvo.seguranca, ativo=salvo.ativo, credencial_trocada=form.senha_trocada)
         messages.success(request, "Servidor de e-mail salvo. Use \"Enviar teste\" para conferir.")
         return redirect("envios:smtp")
     return render(request, "envios/smtp.html", {"form": form, "config": atual})

@@ -3,6 +3,8 @@
 A senha do SMTP fica cifrada (cofre/cifra.py); depois de salva, só os 4 últimos
 caracteres aparecem na tela, e só para o admin.
 """
+from datetime import timedelta
+
 from django.conf import settings
 from django.db import models
 from django.utils import timezone
@@ -60,7 +62,10 @@ class ConfigSmtp(ModeloDaOrganizacao):
 
     @property
     def teste_pendente(self):
-        return bool(self.teste_pedido_em and (self.testado_em is None or self.testado_em < self.teste_pedido_em))
+        # Pedido há mais de 10 min sem resposta: o trabalhador está desligado; a tela para de esperar.
+        if not self.teste_pedido_em or self.teste_pedido_em < timezone.now() - timedelta(minutes=10):
+            return False
+        return self.testado_em is None or self.testado_em < self.teste_pedido_em
 
 
 class Frequencia(models.TextChoices):

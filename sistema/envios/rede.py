@@ -19,7 +19,10 @@ class EnderecoProibido(OSError):
 
 
 def ip_publico(ip):
-    endereco = ipaddress.ip_address(ip)
+    try:
+        endereco = ipaddress.ip_address(ip)
+    except ValueError:
+        return False
     if getattr(endereco, "ipv4_mapped", None):
         endereco = endereco.ipv4_mapped
     return endereco.is_global and not endereco.is_multicast
@@ -27,11 +30,12 @@ def ip_publico(ip):
 
 def eh_ip_literal_interno(texto):
     """Para a validação do formulário: True se o texto já é um IP que não é da Internet."""
+    nome = texto.strip().lower().rstrip(".")
     try:
-        return not ip_publico(texto.strip("[]"))
-    except ValueError:
-        return texto.strip().lower().rstrip(".") in ("localhost", "localhost.localdomain") \
-            or texto.strip().lower().endswith(".localhost")
+        ipaddress.ip_address(nome.strip("[]"))
+    except ValueError:   # é um nome: só "localhost" se sabe de antemão; o resto a conexão confere
+        return nome in ("localhost", "localhost.localdomain") or nome.endswith(".localhost")
+    return not ip_publico(nome.strip("[]"))
 
 
 def resolver_publico(host, porta):

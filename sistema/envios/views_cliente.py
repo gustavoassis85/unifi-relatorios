@@ -1,6 +1,9 @@
-"""Agendamentos na página do cliente: criar, editar, pausar, retomar e excluir."""
+"""Agendamentos na página do cliente: criar, editar, pausar, retomar e excluir; reenviar relatório."""
+from datetime import timedelta
+
 from django.contrib import messages
 from django.shortcuts import get_object_or_404, redirect, render
+from django.utils import timezone
 from django.views.decorators.http import require_http_methods
 
 from auditoria.models import Acao
@@ -12,6 +15,8 @@ from organizacoes.permissoes import exige
 from .agenda import proxima
 from .forms import AgendamentoForm
 from .models import Agendamento, ConfigSmtp
+
+MAX_ENVIOS_POR_DIA = 5   # por relatório: protege a caixa do cliente final de cliques repetidos
 
 
 def contexto_agendamentos(cliente):
@@ -110,6 +115,11 @@ def reenviar(request, pk, relatorio_pk):
         return _voltar(cliente)
     if Envio.objects.filter(relatorio=relatorio, situacao=SituacaoEnvio.PENDENTE).exists():
         messages.error(request, "Este relatório já está sendo enviado.")
+        return _voltar(cliente)
+    ultimas_24h = Envio.objects.filter(relatorio=relatorio, criado_em__gte=timezone.now() - timedelta(days=1))
+    if ultimas_24h.count() >= MAX_ENVIOS_POR_DIA:
+        messages.error(request, f"Este relatório já foi enviado {MAX_ENVIOS_POR_DIA} vezes nas últimas 24 horas. "
+                                "Tente de novo amanhã.")
         return _voltar(cliente)
     envio = criar_envio(relatorio, agendamento.destinatarios, pedido_por=request.user)
     registrar(request, Acao.RELATORIO_REENVIADO, cliente_id=cliente.pk, relatorio_id=relatorio.pk,

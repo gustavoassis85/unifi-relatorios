@@ -105,10 +105,11 @@ def ao_ficar_pronto(sender, relatorio, **kwargs):
 def mensagem_do_relatorio(relatorio, destinatarios):
     marca = marca_da_organizacao()
     cliente = relatorio.cliente
+    nome = " ".join(cliente.nome.split())   # sem quebra de linha no assunto
     linhas = [
         "Olá,",
         "",
-        f"Segue em anexo o relatório de saúde da rede de {cliente.nome}, referente a: {relatorio.rotulo.lower()}.",
+        f"Segue em anexo o relatório de saúde da rede de {nome}, referente a: {relatorio.rotulo.lower()}.",
         "",
         "Qualquer dúvida, fale com a gente.",
         "",
@@ -117,7 +118,7 @@ def mensagem_do_relatorio(relatorio, destinatarios):
     if marca.contato:
         linhas.append(marca.contato)
     mensagem = EmailMessage(
-        subject=f"Relatório de saúde da rede — {cliente.nome} — {relatorio.rotulo}",
+        subject=f"Relatório de saúde da rede — {nome} — {relatorio.rotulo}",
         body="\n".join(linhas) + "\n",
         to=list(destinatarios),
     )
@@ -151,6 +152,10 @@ def enviar_relatorio(tarefa_):
                     _enfileirar_envio(envio, executar_em=timezone.now() + ESPERAS[envio.tentativas - 1])
                 else:
                     envio.situacao = SituacaoEnvio.FALHOU
+            except Exception as erro:  # noqa: BLE001 - nunca deixar o envio preso em "Enviando"
+                log.exception("Erro inesperado no envio %s", envio.pk)
+                envio.situacao = SituacaoEnvio.FALHOU
+                envio.motivo = f"Erro inesperado ao montar ou enviar o e-mail ({erro.__class__.__name__})."
         envio.save(update_fields=["tentativas", "situacao", "motivo", "enviado_em"])
     log.info("Envio %s do relatório %s: %s (tentativa %s, %s destinatário(s))", envio.pk, envio.relatorio_id,
              envio.situacao, envio.tentativas, len(envio.destinatarios))
