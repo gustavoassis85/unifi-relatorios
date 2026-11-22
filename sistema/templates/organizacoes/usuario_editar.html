@@ -1,5 +1,7 @@
 {% extends "base.html" %}
 {% block head_title %}{{ vinculo.usuario.email }}{% endblock %}
+{% block titulo_tela %}Usuários{% endblock %}
+{% block largura %} estreito{% endblock %}
 {% block content %}
   <h1>{{ vinculo.usuario.email }}</h1>
   {% if proprio %}<p class="nota">Esta é a sua conta: papel e situação não podem ser mudados por você.</p>{% endif %}

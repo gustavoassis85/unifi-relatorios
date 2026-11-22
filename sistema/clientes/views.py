@@ -56,10 +56,13 @@ def detalhe(request, pk):
     from envios.views_cliente import contexto_agendamentos
     from relatorios.views_cliente import contexto_relatorios
 
+    from .situacao import situacao_dos_clientes
+
     cliente = _cliente_da_organizacao(pk)
     consoles = list(Console.objects.filter(cliente=cliente))
     contexto = {
         "cliente": cliente,
+        "situacao": situacao_dos_clientes([cliente], completo=False)[0],
         "chave": chave_do_cliente(cliente),
         "consoles": consoles,
         **situacao_das_coletas(cliente, consoles),

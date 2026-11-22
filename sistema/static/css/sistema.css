@@ -232,6 +232,13 @@ html.painel-recolhido .painel { visibility: hidden; }
 .celula-estado { display: flex; align-items: center; gap: 8px; }
 td .pulso { width: 168px; }
 
+/* ---------- página do cliente ---------- */
+
+.cabecalho-cliente { align-items: flex-start; }
+.cabecalho-cliente .estado { display: flex; align-items: center; gap: 8px; color: var(--suave); margin-top: 4px; }
+.pulso-cliente .pulso { height: 14px; }
+.pulso-cliente .nota { margin: 6px 0 0; font-size: 13px; }
+
 /* ---------- blocos da página (seções) ---------- */
 
 .bloco {
@@ -257,6 +264,12 @@ tbody tr:last-child td { border-bottom: 0; }
 .bloco > table th:first-child, .bloco > table td:first-child { padding-left: 0; }
 .bloco > table th:last-child, .bloco > table td:last-child { padding-right: 0; }
 .tabela { background: var(--superficie); border: 1px solid var(--borda); border-radius: var(--raio); overflow-x: auto; }
+/* Tabela solta na página ganha o mesmo quadro. */
+.conteudo > table {
+  background: var(--superficie); border: 1px solid var(--borda); border-radius: var(--raio);
+  border-collapse: separate; border-spacing: 0; overflow: hidden;
+}
+.conteudo > table + p, .tabela + p { margin-top: 12px; }
 td.acoes { text-align: right; white-space: nowrap; }
 td.acoes a + a, td.acoes form, td.acoes form + a { margin-left: 16px; }
 td.acoes form { display: inline; }
@@ -361,6 +374,15 @@ ul.higiene li + li { margin-top: 8px; }
 .tela-solta .caixa .nome-sistema { display: flex; align-items: center; gap: 10px; font-weight: 600; color: var(--acao); margin-bottom: 20px; }
 .tela-solta .campo { max-width: none; }
 .tela-solta .rodape-conta { margin-top: 16px; display: flex; justify-content: space-between; gap: 12px; color: var(--suave); }
+
+/* Formulários do allauth (MFA, senha): rótulo em cima do campo. */
+form > p:has(> input), form > p:has(> select), form > p:has(> textarea) {
+  display: flex; flex-direction: column; gap: 4px; max-width: 480px; margin: 0 0 16px;
+}
+form > p:has(> input[type="checkbox"]) { flex-direction: row; align-items: center; gap: 8px; }
+form > p > label { font-weight: 600; }
+.titulo-caixa { margin-bottom: 4px; }
+.tela-solta .campo input { width: 100%; }
 
 /* ---------- celular ---------- */
 

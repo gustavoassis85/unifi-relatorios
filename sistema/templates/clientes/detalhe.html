@@ -1,10 +1,28 @@
 {% extends "base.html" %}
 {% block head_title %}{{ cliente.nome }}{% endblock %}
+{% block titulo_tela %}{{ cliente.nome }}{% endblock %}
 {% block content %}
-  <div class="cabecalho">
-    <h1>{{ cliente.nome }}</h1>
-    {% if pode_editar_clientes %}<a href="{% url 'clientes:editar' cliente.pk %}">Editar nome</a>{% endif %}
+  <div class="cabecalho cabecalho-cliente">
+    <div>
+      <h1>{{ cliente.nome }}</h1>
+      {% if situacao %}
+        <div class="estado"><span class="ponto {{ situacao.estado }}" aria-hidden="true"></span><span><span class="so-leitor">{{ situacao.rotulo_estado }}: </span>{{ situacao.resumo }}</span></div>
+      {% endif %}
+    </div>
+    <div class="acoes-topo">
+      {% if pode_editar_clientes %}
+        <a class="botao secundario" href="{% url 'clientes:editar' cliente.pk %}">Editar nome</a>
+        <a class="botao secundario" href="{% url 'clientes:apagar' cliente.pk %}">Apagar cliente</a>
+      {% endif %}
+    </div>
   </div>
+  {% if situacao %}
+    <div class="bloco pulso-cliente">
+      {% include "clientes/_pulso.html" with s=situacao %}
+      <div class="regua" aria-hidden="true"><span>há 24 h</span><span>há 12 h</span><span>agora</span></div>
+      <p class="nota">{{ situacao.descricao_horas }}.</p>
+    </div>
+  {% endif %}
 
   <section class="bloco">
     <h2>Conexão com a UniFi</h2>
@@ -44,7 +62,7 @@
     {% if ultima_execucao %}
       <dl class="dados">
         <dt>Última coleta</dt>
-        <dd>{{ ultima_execucao.iniciada_em|date:"d/m/Y H:i" }} · {% if ultima_execucao.automatica %}automática{% else %}pedida na tela{% endif %} ·
+        <dd>{{ ultima_execucao.iniciada_em|date:"d/m/Y H:i" }}, {% if ultima_execucao.automatica %}automática{% else %}pedida na tela{% endif %}:
           <span class="{% if ultima_execucao.resultado == 'ok' %}ok{% elif ultima_execucao.resultado != 'rodando' %}falha{% endif %}">{{ ultima_execucao.get_resultado_display }}</span></dd>
       </dl>
       {% if ultima_execucao.partes %}

@@ -2,7 +2,7 @@
   {% if chave.teste_pendente %}
     Testando a conexão com a UniFi…
   {% elif chave.testada_em %}
-    {{ chave.testada_em|date:"d/m/Y H:i" }} ·
+    {{ chave.testada_em|date:"d/m/Y H:i" }}:
     <span class="{% if chave.teste_ok %}ok{% else %}falha{% endif %}">{{ chave.teste_resultado }}</span>
   {% else %}
     Ainda não testada.

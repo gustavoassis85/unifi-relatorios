@@ -1,5 +1,7 @@
 {% extends "base.html" %}
 {% block head_title %}Apagar {{ cliente.nome }}{% endblock %}
+{% block titulo_tela %}{{ cliente.nome }}{% endblock %}
+{% block largura %} estreito{% endblock %}
 {% block content %}
   <h1>Apagar {{ cliente.nome }}?</h1>
   <p>O cliente sai da lista e não pode ser recuperado.{% if chave %} A chave da UniFi dele também será apagada.{% endif %}</p>
