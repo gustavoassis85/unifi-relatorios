@@ -1,30 +1,68 @@
 {% extends "base.html" %}
 {% block head_title %}Clientes{% endblock %}
+{% block titulo_tela %}Clientes{% endblock %}
 {% block content %}
   <div class="cabecalho">
     <h1>Clientes</h1>
-    {% if pode_editar_clientes %}<a class="botao" href="{% url 'clientes:novo' %}">Cadastrar cliente</a>{% endif %}
+    <div class="acoes-topo">
+      {% if total %}
+        <div class="alternar" role="group" aria-label="Forma de mostrar">
+          <a href="?visao=quadros{% if filtro != 'todos' %}&amp;situacao={{ filtro }}{% endif %}" title="Quadros" aria-label="Mostrar em quadros"
+             {% if visao == "quadros" %}aria-current="page"{% endif %}><svg class="icone p" aria-hidden="true"><use href="#i-clientes"/></svg></a>
+          <a href="?visao=lista{% if filtro != 'todos' %}&amp;situacao={{ filtro }}{% endif %}" title="Lista" aria-label="Mostrar em lista"
+             {% if visao == "lista" %}aria-current="page"{% endif %}><svg class="icone p" aria-hidden="true"><use href="#i-lista"/></svg></a>
+        </div>
+      {% endif %}
+      {% if pode_editar_clientes %}
+        <a class="botao" href="{% url 'clientes:novo' %}"><svg class="icone p" aria-hidden="true"><use href="#i-mais"/></svg>Cadastrar cliente</a>
+      {% endif %}
+    </div>
   </div>
-  {% if clientes %}
-    <table>
-      <thead><tr><th>Nome</th><th>Cadastrado em</th>{% if pode_editar_clientes %}<th></th>{% endif %}</tr></thead>
-      <tbody>
-        {% for cliente in clientes %}
-          <tr>
-            <td><a href="{% url 'clientes:detalhe' cliente.pk %}">{{ cliente.nome }}</a></td>
-            <td>{{ cliente.criado_em|date:"d/m/Y" }}</td>
-            {% if pode_editar_clientes %}
-              <td class="acoes">
-                <a href="{% url 'clientes:editar' cliente.pk %}">Editar</a>
-                <a href="{% url 'clientes:apagar' cliente.pk %}">Apagar</a>
-              </td>
-            {% endif %}
-          </tr>
-        {% endfor %}
-      </tbody>
-    </table>
-  {% else %}
+
+  {% if not total %}
     <p class="vazio">Nenhum cliente cadastrado ainda.
-      {% if pode_editar_clientes %}<a href="{% url 'clientes:novo' %}">Cadastrar o primeiro</a>.{% endif %}</p>
+      {% if pode_editar_clientes %}<a href="{% url 'clientes:novo' %}">Cadastre o primeiro</a> e depois a chave da UniFi dele para as coletas começarem.{% endif %}</p>
+  {% elif not situacoes %}
+    <p class="vazio">Nenhum cliente com esse filtro. <a href="{% url 'clientes:lista' %}?visao={{ visao }}">Mostrar todos</a>.</p>
+  {% elif visao == "lista" %}
+    <div class="tabela">
+      <table>
+        <thead><tr><th>Cliente</th><th>Situação</th><th>Coletas nas últimas 24 h</th><th>Último relatório</th><th>Próximo agendamento</th>{% if pode_editar_clientes %}<th><span class="so-leitor">Ações</span></th>{% endif %}</tr></thead>
+        <tbody>
+          {% for s in situacoes %}
+            <tr>
+              <td><a href="{% url 'clientes:detalhe' s.cliente.pk %}">{{ s.cliente.nome }}</a></td>
+              <td><span class="celula-estado"><span class="ponto {{ s.estado }}" aria-hidden="true"></span>{{ s.resumo }}</span></td>
+              <td>{% include "clientes/_pulso.html" %}<span class="nota">{% if s.horas_com_coleta %}{{ s.horas_ok }} de 24 ok{% else %}sem coleta{% endif %}</span></td>
+              <td>{% include "clientes/_ultimo_relatorio.html" %}</td>
+              <td>{% if s.proximo_agendamento %}{{ s.proximo_agendamento|date:"d/m/Y H:i" }}{% else %}<span class="nota">Nenhum</span>{% endif %}</td>
+              {% if pode_editar_clientes %}
+                <td class="acoes"><a href="{% url 'clientes:editar' s.cliente.pk %}">Editar</a><a href="{% url 'clientes:apagar' s.cliente.pk %}">Apagar</a></td>
+              {% endif %}
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  {% else %}
+    <div class="quadros">
+      {% for s in situacoes %}
+        <a class="quadro-cliente" href="{% url 'clientes:detalhe' s.cliente.pk %}">
+          <div>
+            <div class="nome">{{ s.cliente.nome }}</div>
+            <div class="estado"><span class="ponto {{ s.estado }}" aria-hidden="true"></span><span><span class="so-leitor">{{ s.rotulo_estado }}: </span>{{ s.resumo }}</span></div>
+          </div>
+          <div>
+            {% include "clientes/_pulso.html" %}
+            <div class="regua" aria-hidden="true"><span>há 24 h</span><span>há 12 h</span><span>agora</span></div>
+            <div class="horas">{% if s.horas_com_coleta %}{{ s.horas_ok }} de 24 horas com coleta completa{% else %}Nenhuma coleta nas últimas 24 horas{% endif %}</div>
+          </div>
+          <div class="rodape">
+            <div>Último relatório{% include "clientes/_ultimo_relatorio.html" with forte=True %}</div>
+            <div>Próximo agendamento<strong>{% if s.proximo_agendamento %}{{ s.proximo_agendamento|date:"d/m H:i" }}{% else %}Nenhum{% endif %}</strong></div>
+          </div>
+        </a>
+      {% endfor %}
+    </div>
   {% endif %}
 {% endblock %}

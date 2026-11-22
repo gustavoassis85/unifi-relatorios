@@ -1,5 +1,7 @@
 {% extends "base.html" %}
 {% block head_title %}{{ titulo }}{% endblock %}
+{% block titulo_tela %}{{ cliente.nome }}{% endblock %}
+{% block largura %} estreito{% endblock %}
 {% block content %}
   <h1>{{ titulo }}</h1>
   {% if chave %}<p class="nota">A chave atual termina em <code>{{ chave.final|default:"····" }}</code>. A nova substitui a atual.</p>{% endif %}

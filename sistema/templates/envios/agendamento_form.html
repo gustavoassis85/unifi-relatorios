@@ -1,5 +1,7 @@
 {% extends "base.html" %}
 {% block head_title %}{% if agendamento %}Editar agendamento{% else %}Novo agendamento{% endif %} — {{ cliente.nome }}{% endblock %}
+{% block titulo_tela %}{{ cliente.nome }}{% endblock %}
+{% block largura %} estreito{% endblock %}
 {% block content %}
   <h1>{% if agendamento %}Editar agendamento{% else %}Novo agendamento{% endif %} de {{ cliente.nome }}</h1>
   <p class="nota">Na data marcada, o relatório é gerado e enviado em PDF para os destinatários pelo servidor de e-mail da organização.</p>

@@ -109,6 +109,7 @@ TEMPLATES = [
                 "django.contrib.auth.context_processors.auth",
                 "django.contrib.messages.context_processors.messages",
                 "organizacoes.permissoes.para_templates",
+                "clientes.contexto.menu_e_painel",
             ],
         },
     },

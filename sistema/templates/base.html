@@ -3,45 +3,109 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light dark">
   {# O HTMX não injeta estilos inline (a CSP bloquearia). #}
   <meta name="htmx-config" content='{"includeIndicatorStyles": false}'>
   <title>{% block head_title %}{% endblock head_title %} · Dashboard UniFi</title>
+  <link rel="preload" href="{% static 'fonts/atkinson-next-400.woff2' %}" as="font" type="font/woff2" crossorigin>
   <link rel="stylesheet" href="{% static 'css/sistema.css' %}">
+  <script src="{% static 'js/painel.js' %}"></script>
   <script src="{% static 'js/htmx.min.js' %}" defer></script>
   {% block extra_head %}{% endblock extra_head %}
 </head>
 <body hx-boost="true">
+  {% include "_icones.html" %}
   {% block body %}
-  <header class="topo">
-    <span class="marca">Dashboard UniFi</span>
-    {% if user.is_authenticated %}
-      {% if vinculo %}
-        <nav>
-          <span class="organizacao">{{ vinculo.organizacao.nome }}</span>
-          <a href="{% url 'clientes:lista' %}">Clientes</a>
-          {% if pode_gerenciar_usuarios %}<a href="{% url 'usuarios:lista' %}">Usuários</a>{% endif %}
-          {% if pode_editar_marca %}<a href="{% url 'relatorios:marca' %}">Marca</a>{% endif %}
-          {% if pode_configurar_smtp %}<a href="{% url 'envios:smtp' %}">E-mail</a>{% endif %}
-        </nav>
-      {% endif %}
-      <div class="conta">
-        <a href="{% url 'mfa_index' %}">{{ user.email }}</a>
-        <form method="post" action="{% url 'account_logout' %}">
-          {% csrf_token %}
-          <button type="submit" class="link">Sair</button>
-        </form>
-      </div>
-    {% endif %}
-  </header>
+  {% if user.is_authenticated and vinculo %}
+    <div class="app{% if not mostrar_painel %} sem-painel{% endif %}">
+      <header class="topo">
+        <a class="nome-sistema" href="{% url 'clientes:lista' %}">
+          <span class="simbolo"><svg class="icone" aria-hidden="true"><use href="#i-clientes"/></svg></span>
+          Dashboard UniFi
+        </a>
+        <span class="titulo-tela">{% block titulo_tela %}{% endblock titulo_tela %}</span>
+        <span class="organizacao" title="Organização">
+          <svg class="icone p" aria-hidden="true"><use href="#i-organizacao"/></svg>{{ vinculo.organizacao.nome }}
+        </span>
+      </header>
 
-  <main>
-    {% if messages %}
-      <ul class="mensagens">
-        {% for message in messages %}<li class="{{ message.tags }}">{{ message }}</li>{% endfor %}
-      </ul>
-    {% endif %}
-    {% block content %}{% endblock content %}
-  </main>
+      <nav class="faixa" aria-label="Menu principal">
+        <a class="item-faixa" href="{% url 'clientes:lista' %}" title="Clientes" aria-label="Clientes"
+           {% if secao_menu == "clientes" %}aria-current="page"{% endif %}>
+          <svg class="icone" aria-hidden="true"><use href="#i-clientes"/></svg>
+        </a>
+        {% if mostrar_painel %}
+          <button type="button" class="item-faixa so-celular" data-abrir-painel aria-expanded="false"
+                  aria-controls="painel-clientes" title="Lista de clientes" aria-label="Lista de clientes">
+            <svg class="icone" aria-hidden="true"><use href="#i-lista"/></svg>
+          </button>
+        {% endif %}
+        {% if pode_gerenciar_usuarios %}
+          <a class="item-faixa" href="{% url 'usuarios:lista' %}" title="Usuários" aria-label="Usuários"
+             {% if secao_menu == "usuarios" %}aria-current="page"{% endif %}>
+            <svg class="icone" aria-hidden="true"><use href="#i-usuarios"/></svg>
+          </a>
+        {% endif %}
+        {% if pode_editar_marca %}
+          <a class="item-faixa" href="{% url 'relatorios:marca' %}" title="Marca dos relatórios"
+             aria-label="Marca dos relatórios" {% if secao_menu == "marca" %}aria-current="page"{% endif %}>
+            <svg class="icone" aria-hidden="true"><use href="#i-marca"/></svg>
+          </a>
+        {% endif %}
+        {% if pode_configurar_smtp %}
+          <a class="item-faixa" href="{% url 'envios:smtp' %}" title="Servidor de e-mail"
+             aria-label="Servidor de e-mail" {% if secao_menu == "email" %}aria-current="page"{% endif %}>
+            <svg class="icone" aria-hidden="true"><use href="#i-email"/></svg>
+          </a>
+        {% endif %}
+        <div class="baixo">
+          <a class="item-faixa" href="{% url 'mfa_index' %}" title="Segurança da conta ({{ user.email }})"
+             aria-label="Segurança da conta ({{ user.email }})" {% if secao_menu == "conta" %}aria-current="page"{% endif %}>
+            <svg class="icone" aria-hidden="true"><use href="#i-seguranca"/></svg>
+          </a>
+          <form method="post" action="{% url 'account_logout' %}">
+            {% csrf_token %}
+            <button type="submit" class="item-faixa" title="Sair" aria-label="Sair">
+              <svg class="icone" aria-hidden="true"><use href="#i-sair"/></svg>
+            </button>
+          </form>
+        </div>
+      </nav>
+
+      {% if mostrar_painel %}{% include "clientes/_painel.html" %}{% endif %}
+
+      <main class="principal" id="principal">
+        <div class="conteudo{% block largura %}{% endblock largura %}">
+  {% else %}
+    <main class="tela-solta">
+      <div class="caixa">
+        <div class="nome-sistema">
+          <svg class="icone" aria-hidden="true"><use href="#i-clientes"/></svg> Dashboard UniFi
+        </div>
+  {% endif %}
+
+          {% if messages %}
+            <ul class="mensagens" role="status">
+              {% for message in messages %}<li class="{{ message.tags }}">{{ message }}</li>{% endfor %}
+            </ul>
+          {% endif %}
+          {% block content %}{% endblock content %}
+
+  {% if user.is_authenticated and vinculo %}
+        </div>
+      </main>
+    </div>
+  {% else %}
+        {% if user.is_authenticated %}
+          <form method="post" action="{% url 'account_logout' %}" class="rodape-conta">
+            {% csrf_token %}
+            <span>{{ user.email }}</span>
+            <button type="submit" class="link">Sair</button>
+          </form>
+        {% endif %}
+      </div>
+    </main>
+  {% endif %}
   {% endblock body %}
   {% block extra_body %}{% endblock extra_body %}
 </body>

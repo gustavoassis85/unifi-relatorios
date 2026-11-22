@@ -1,0 +1,3 @@
+<div class="pulso" role="img" aria-label="Coletas nas últimas 24 horas: {{ s.descricao_horas }}">
+  {% for h in s.horas %}<span class="{{ h|default:'' }}"></span>{% endfor %}
+</div>

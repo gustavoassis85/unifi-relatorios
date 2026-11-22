@@ -18,7 +18,32 @@ def _cliente_da_organizacao(pk):
 
 @exige(papeis.pode_ver_clientes)
 def lista(request):
-    return render(request, "clientes/lista.html", {"clientes": Cliente.objects.all()})
+    from .situacao import FILTROS, filtrar, situacao_dos_clientes
+
+    visao = "lista" if request.GET.get("visao") == "lista" else "quadros"
+    filtro = request.GET.get("situacao") if request.GET.get("situacao") in dict(FILTROS) else "todos"
+    busca = request.GET.get("busca", "")
+    todas = situacao_dos_clientes(Cliente.objects.all())
+    return render(request, "clientes/lista.html", {
+        "situacoes": filtrar(todas, filtro, busca), "total": len(todas), "visao": visao,
+        "filtro": filtro, "busca": busca,
+    })
+
+
+@exige(papeis.pode_ver_clientes)
+@require_http_methods(["GET"])
+def painel(request):
+    """Lista do painel lateral, filtrada (a busca e o filtro do painel pedem este pedaço)."""
+    from .situacao import FILTROS, filtrar, situacao_dos_clientes
+
+    filtro = request.GET.get("situacao") if request.GET.get("situacao") in dict(FILTROS) else "todos"
+    busca = request.GET.get("busca", "")
+    atual = request.GET.get("atual", "")
+    situacoes = filtrar(situacao_dos_clientes(Cliente.objects.all(), completo=False), filtro, busca)
+    return render(request, "clientes/_lista_painel.html", {
+        "situacoes": situacoes, "filtrado": filtro != "todos" or bool(busca.strip()),
+        "cliente": {"pk": int(atual)} if atual.isdigit() else None,
+    })
 
 
 @exige(papeis.pode_ver_clientes)
@@ -31,10 +56,13 @@ def detalhe(request, pk):
     from envios.views_cliente import contexto_agendamentos
     from relatorios.views_cliente import contexto_relatorios
 
+    from .situacao import situacao_dos_clientes
+
     cliente = _cliente_da_organizacao(pk)
     consoles = list(Console.objects.filter(cliente=cliente))
     contexto = {
         "cliente": cliente,
+        "situacao": situacao_dos_clientes([cliente], completo=False)[0],
         "chave": chave_do_cliente(cliente),
         "consoles": consoles,
         **situacao_das_coletas(cliente, consoles),

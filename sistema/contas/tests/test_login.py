@@ -192,3 +192,9 @@ def test_login_do_admin_nunca_aceita_senha(client, dono, operador):
     )
     assert client.get(URL_ADMIN).status_code == 302
     assert client.get(URL_CLIENTES).context["user"].email == "op@a.com"
+
+
+def test_tela_de_login_sem_convite_de_cadastro(client):
+    html = client.get(URL_LOGIN).content.decode()
+    assert "Entrar" in html and 'name="login"' in html and 'name="password"' in html
+    assert "cadastre-se" not in html.lower() and reverse("account_signup") not in html
