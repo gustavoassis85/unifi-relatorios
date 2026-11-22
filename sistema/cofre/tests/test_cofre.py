@@ -93,10 +93,13 @@ def test_pagina_de_erro_esconde_campos_de_formulario_com_chave_ou_senha():
 
 
 def _rodar_configuracao(chave):
-    ambiente = dict(os.environ, UNIFI_CHAVE_MESTRA=chave, DJANGO_SETTINGS_MODULE="config.settings")
+    ambiente = dict(
+        os.environ, UNIFI_CHAVE_MESTRA=chave, DJANGO_SETTINGS_MODULE="config.settings",
+        PYTHONIOENCODING="utf-8",
+    )
     return subprocess.run(
         [sys.executable, "-c", "import django; django.setup()"],
-        cwd=RAIZ, env=ambiente, capture_output=True, text=True, timeout=60,
+        cwd=RAIZ, env=ambiente, capture_output=True, text=True, encoding="utf-8", timeout=60,
     )
 
 
