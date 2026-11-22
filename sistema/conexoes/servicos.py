@@ -7,6 +7,7 @@ from dataclasses import dataclass
 
 from django.core.cache import cache
 from django.utils import timezone
+from django.views.decorators.debug import sensitive_variables
 
 from cofre.cifra import ErroCofre
 from organizacoes.isolamento import exigir_organizacao
@@ -87,6 +88,7 @@ def sincronizar_consoles(cliente, resumos, agora=None):
     return len(vistos), conectados
 
 
+@sensitive_variables()
 def testar_conexao(chave):
     """Testa a chave de um cliente, atualiza os consoles e guarda o resultado na chave."""
     if not reservar_teste(exigir_organizacao()):

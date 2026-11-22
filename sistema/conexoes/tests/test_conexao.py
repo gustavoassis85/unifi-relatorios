@@ -299,3 +299,23 @@ def test_banco_recusa_console_em_cliente_de_outra_organizacao(msps):
         with transaction.atomic():  # controle: com o cliente da própria organização, funciona
             sql(inserir, [msps.org_a.pk, msps.cliente_a.pk])
             sql("set constraints all immediate")
+
+
+# Revisão de segurança --------------------------------------------------------------
+
+def test_nome_vindo_da_unifi_nao_vira_codigo_na_pagina(com_chaves, entrar_como, unifi):
+    unifi.hosts = [host("xss:1", '<script>alert("x")</script>')]
+    html = clicar_testar(entrar_como(com_chaves.admin_a), com_chaves.cliente_a).content.decode()
+    assert '<script>alert("x")</script>' not in html
+    assert "&lt;script&gt;" in html
+
+
+def test_apagar_cliente_apaga_consoles_so_dele(com_chaves, entrar_como, unifi):
+    clicar_testar(entrar_como(com_chaves.admin_a), com_chaves.cliente_a)
+    clicar_testar(entrar_como(com_chaves.admin_b), com_chaves.cliente_b)
+    entrar_como(com_chaves.admin_a).post(reverse("clientes:apagar", args=[com_chaves.cliente_a.pk]))
+    with contexto(organizacao_id=com_chaves.org_a.pk):
+        assert not Console.objects.exists()
+        assert not ChaveUniFi.objects.exists()
+    assert len(consoles_de(com_chaves.org_b, com_chaves.cliente_b)) == 2
+    assert chave_de(com_chaves.org_b, com_chaves.cliente_b) is not None
