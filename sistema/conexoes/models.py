@@ -27,6 +27,7 @@ class ChaveUniFi(ModeloDaOrganizacao):
     final = models.CharField("últimos 4 caracteres", max_length=4, editable=False)
     cadastrada_em = models.DateTimeField("cadastrada em", default=timezone.now, editable=False)
     trocada_em = models.DateTimeField("trocada em", null=True, blank=True, editable=False)
+    teste_pedido_em = models.DateTimeField("teste pedido em", null=True, blank=True, editable=False)
     testada_em = models.DateTimeField("último teste em", null=True, blank=True, editable=False)
     teste_ok = models.BooleanField("último teste funcionou", null=True, editable=False)
     teste_resultado = models.CharField("resultado do último teste", max_length=300, blank=True, editable=False)
@@ -47,6 +48,10 @@ class ChaveUniFi(ModeloDaOrganizacao):
             self.trocada_em = timezone.now()
         self.chave_cifrada = cifrar(chave)
         self.final = ultimos4(chave)
+
+    @property
+    def teste_pendente(self):
+        return bool(self.teste_pedido_em and (self.testada_em is None or self.testada_em < self.teste_pedido_em))
 
     def abrir(self):
         """A chave em texto, só para chamar a UniFi. Nunca mostrar nem registrar."""

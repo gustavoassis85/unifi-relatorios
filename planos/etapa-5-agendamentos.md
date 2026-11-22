@@ -29,7 +29,7 @@ Fora desta etapa: servidor de produção (etapa 6), acesso do cliente final com 
    - Falha ao gerar o PDF: nada é enviado e o histórico mostra o erro, como já acontece hoje.
    - Se o trabalhador ficou desligado na hora marcada, o agendamento roda uma vez assim que ele volta (não repete as datas perdidas).
 8. Cada envio fica registrado (relatório, destinatários, situação, motivo, quando), sob RLS, e é apagado junto com o relatório (13 meses). Auditoria: SMTP alterado, teste enviado, agendamento criado, alterado, pausado ou excluído, relatório reenviado. Os e-mails dos destinatários são dados pessoais informados pelo MSP: só ficam no agendamento e no registro do envio, e nunca aparecem no log.
-9. Pendência da etapa 2: o "Testar conexão" deixa de segurar a transação por até 30 s. A consulta à UniFi passa a ser feita fora da transação, e o resultado é gravado numa transação curta.
+9. Pendência da etapa 2: o "Testar conexão" deixa de segurar a transação por até 30 s. A consulta à UniFi passa a ser feita fora da transação, e o resultado é gravado numa transação curta. (Como ficou: a requisição inteira roda numa transação do middleware, então o teste passou para o trabalhador, como o "Enviar teste" do SMTP; a tela mostra "Testando…" e recarrega quando termina.)
 
 ## Requisitos
 

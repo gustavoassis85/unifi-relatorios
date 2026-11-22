@@ -9,6 +9,7 @@ from clientes.models import Cliente
 from conexoes import servicos
 from conexoes.models import ChaveUniFi, Console
 from organizacoes.isolamento import contexto
+from tarefas.fila import executar, pegar_proxima
 from unifi.api import ErroApi
 
 pytestmark = pytest.mark.django_db
@@ -98,8 +99,20 @@ def com_chaves(msps):
     return msps
 
 
+def rodar_fila():
+    while (t := pegar_proxima()) is not None:
+        executar(t)
+
+
 def clicar_testar(client, cliente):
-    return client.post(reverse("conexoes:testar", args=[cliente.pk]), follow=True)
+    """Clica, deixa o trabalhador rodar o teste e abre a página do cliente de novo."""
+    resposta = client.post(reverse("conexoes:testar", args=[cliente.pk]), follow=True)
+    rodar_fila()
+    if resposta.status_code != 200:
+        return resposta
+    pagina = client.get(reverse("clientes:detalhe", args=[cliente.pk]))
+    pagina.content = resposta.content + pagina.content   # mensagens do clique + página atualizada
+    return pagina
 
 
 # Teste que funciona -------------------------------------------------------------
@@ -319,3 +332,59 @@ def test_apagar_cliente_apaga_consoles_so_dele(com_chaves, entrar_como, unifi):
         assert not ChaveUniFi.objects.exists()
     assert len(consoles_de(com_chaves.org_b, com_chaves.cliente_b)) == 2
     assert chave_de(com_chaves.org_b, com_chaves.cliente_b) is not None
+
+
+# Teste no trabalhador (pendência da etapa 2) ------------------------------------------
+
+def test_consulta_a_unifi_roda_sem_transacao_aberta(com_chaves, entrar_como, unifi):
+    """O teste da página já roda dentro de uma transação do pytest: a conferência é que nenhuma
+    transação nova (da requisição ou do contexto) está aberta durante a consulta."""
+    base = len(connection.atomic_blocks)
+    profundidades = []
+    original = unifi.listar_hosts
+
+    def listar_conferindo():
+        profundidades.append(len(connection.atomic_blocks))
+        return original()
+
+    unifi.listar_hosts = listar_conferindo
+    clicar_testar(entrar_como(com_chaves.admin_a), com_chaves.cliente_a)
+    assert profundidades == [base]
+
+
+def test_clique_so_enfileira_e_a_pagina_acompanha(com_chaves, entrar_como, unifi):
+    client = entrar_como(com_chaves.operador_a)
+    args = [com_chaves.cliente_a.pk]
+    client.post(reverse("conexoes:testar", args=args))
+    assert unifi.chaves_usadas == []                       # nada foi para a UniFi na requisição
+    assert chave_de(com_chaves.org_a, com_chaves.cliente_a).teste_pendente
+    html = client.get(reverse("clientes:detalhe", args=args)).content.decode()
+    assert "Testando a conexão com a UniFi" in html and reverse("conexoes:situacao_teste", args=args) in html
+    assert client.get(reverse("conexoes:situacao_teste", args=args)).status_code == 200
+    rodar_fila()
+    resposta = client.get(reverse("conexoes:situacao_teste", args=args))
+    assert resposta.status_code == 204 and resposta["HX-Refresh"] == "true"
+    assert not chave_de(com_chaves.org_a, com_chaves.cliente_a).teste_pendente
+    (evento,) = eventos_de_teste(com_chaves.org_a)
+    assert evento.usuario == com_chaves.operador_a
+
+
+def test_dois_cliques_nao_testam_duas_vezes(com_chaves, entrar_como, unifi):
+    client = entrar_como(com_chaves.admin_a)
+    client.post(reverse("conexoes:testar", args=[com_chaves.cliente_a.pk]))
+    client.post(reverse("conexoes:testar", args=[com_chaves.cliente_a.pk]))
+    rodar_fila()
+    assert unifi.chaves_usadas == [CHAVE_A]
+
+
+def test_chave_apagada_antes_do_teste_rodar(com_chaves, entrar_como, unifi):
+    client = entrar_como(com_chaves.admin_a)
+    client.post(reverse("conexoes:testar", args=[com_chaves.cliente_a.pk]))
+    client.post(reverse("conexoes:chave_apagar", args=[com_chaves.cliente_a.pk]))
+    rodar_fila()
+    assert unifi.chaves_usadas == [] and eventos_de_teste(com_chaves.org_a) == []
+
+
+def test_situacao_do_teste_de_b_nao_abre_para_a(com_chaves, entrar_como):
+    url = reverse("conexoes:situacao_teste", args=[com_chaves.cliente_b.pk])
+    assert entrar_como(com_chaves.admin_a).get(url).status_code == 404

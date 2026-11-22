@@ -8,6 +8,7 @@ class ConexoesConfig(AppConfig):
     def ready(self):
         from cofre.registro import registrar
 
+        from . import servicos  # noqa: F401  (registra a tarefa testar_conexao)
         from .models import ChaveUniFi
 
         registrar(ChaveUniFi)  # entra na troca da chave mestra

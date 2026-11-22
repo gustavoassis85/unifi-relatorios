@@ -14,14 +14,7 @@
         <dt>Cadastrada em</dt><dd>{{ chave.cadastrada_em|date:"d/m/Y H:i" }}</dd>
         {% if chave.trocada_em %}<dt>Trocada em</dt><dd>{{ chave.trocada_em|date:"d/m/Y H:i" }}</dd>{% endif %}
         <dt>Último teste</dt>
-        <dd>
-          {% if chave.testada_em %}
-            {{ chave.testada_em|date:"d/m/Y H:i" }} ·
-            <span class="{% if chave.teste_ok %}ok{% else %}falha{% endif %}">{{ chave.teste_resultado }}</span>
-          {% else %}
-            Ainda não testada.
-          {% endif %}
-        </dd>
+        {% include "conexoes/_teste.html" %}
       </dl>
       <div class="botoes">
         {% if pode_testar_conexao %}
