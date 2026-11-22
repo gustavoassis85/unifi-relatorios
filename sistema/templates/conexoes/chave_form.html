@@ -1,0 +1,14 @@
+{% extends "base.html" %}
+{% block head_title %}{{ titulo }}{% endblock %}
+{% block content %}
+  <h1>{{ titulo }}</h1>
+  {% if chave %}<p class="nota">A chave atual termina em <code>{{ chave.final|default:"····" }}</code>. A nova substitui a atual.</p>{% endif %}
+  <form method="post" novalidate autocomplete="off">
+    {% csrf_token %}
+    {% include "_campos.html" %}
+    <div class="botoes">
+      <button type="submit">{% if chave %}Trocar chave{% else %}Salvar chave{% endif %}</button>
+      <a href="{% url 'clientes:detalhe' cliente.pk %}">Cancelar</a>
+    </div>
+  </form>
+{% endblock %}

@@ -1,0 +1,13 @@
+{% extends "base.html" %}
+{% block head_title %}Apagar a chave de {{ cliente.nome }}{% endblock %}
+{% block content %}
+  <h1>Apagar a chave da UniFi de {{ cliente.nome }}?</h1>
+  <p>A chave terminada em <code>{{ chave.final|default:"····" }}</code> será apagada. Sem ela, o sistema não consegue falar com a UniFi deste cliente até uma nova ser cadastrada.</p>
+  <form method="post">
+    {% csrf_token %}
+    <div class="botoes">
+      <button type="submit" class="perigo">Apagar a chave de {{ cliente.nome }}</button>
+      <a href="{% url 'clientes:detalhe' cliente.pk %}">Cancelar</a>
+    </div>
+  </form>
+{% endblock %}

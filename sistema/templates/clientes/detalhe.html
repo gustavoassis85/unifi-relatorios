@@ -1,0 +1,82 @@
+{% extends "base.html" %}
+{% block head_title %}{{ cliente.nome }}{% endblock %}
+{% block content %}
+  <div class="cabecalho">
+    <h1>{{ cliente.nome }}</h1>
+    {% if pode_editar_clientes %}<a href="{% url 'clientes:editar' cliente.pk %}">Editar nome</a>{% endif %}
+  </div>
+
+  <section class="bloco">
+    <h2>Conexão com a UniFi</h2>
+    {% if chave %}
+      <dl class="dados">
+        <dt>Chave da API</dt><dd>terminada em <code>{{ chave.final|default:"····" }}</code></dd>
+        <dt>Cadastrada em</dt><dd>{{ chave.cadastrada_em|date:"d/m/Y H:i" }}</dd>
+        {% if chave.trocada_em %}<dt>Trocada em</dt><dd>{{ chave.trocada_em|date:"d/m/Y H:i" }}</dd>{% endif %}
+        <dt>Último teste</dt>
+        <dd>
+          {% if chave.testada_em %}
+            {{ chave.testada_em|date:"d/m/Y H:i" }} ·
+            <span class="{% if chave.teste_ok %}ok{% else %}falha{% endif %}">{{ chave.teste_resultado }}</span>
+          {% else %}
+            Ainda não testada.
+          {% endif %}
+        </dd>
+      </dl>
+      <div class="botoes">
+        {% if pode_testar_conexao %}
+          <form method="post" action="{% url 'conexoes:testar' cliente.pk %}" hx-disabled-elt="find button">
+            {% csrf_token %}
+            <button type="submit">Testar conexão</button>
+          </form>
+        {% endif %}
+        {% if pode_gerenciar_chaves %}
+          <a href="{% url 'conexoes:chave' cliente.pk %}">Trocar chave</a>
+          <a href="{% url 'conexoes:chave_apagar' cliente.pk %}">Apagar chave</a>
+        {% endif %}
+      </div>
+    {% else %}
+      <p class="vazio">Nenhuma chave da UniFi cadastrada para este cliente.
+        {% if pode_gerenciar_chaves %}<a href="{% url 'conexoes:chave' cliente.pk %}">Cadastrar chave</a>.
+        {% else %}Peça a um admin da organização para cadastrar.{% endif %}</p>
+    {% endif %}
+  </section>
+
+  <section class="bloco">
+    <h2>Consoles</h2>
+    {% if consoles %}
+      <table>
+        <thead><tr><th>Nome</th><th>Modelo</th><th>Situação</th><th>Network</th><th>Acompanhar</th></tr></thead>
+        <tbody>
+          {% for console in consoles %}
+            <tr>
+              <td>{{ console.nome|default:console.host_id }}</td>
+              <td>{{ console.modelo|default:"—" }}</td>
+              <td>{{ console.situacao }}</td>
+              <td>{{ console.versao_network|default:"—" }}</td>
+              <td class="acoes">
+                {{ console.acompanhar|yesno:"Sim,Não" }}
+                {% if pode_testar_conexao %}
+                  {% if console.acompanhar or console.na_conta %}
+                    <form method="post" action="{% url 'conexoes:acompanhar' cliente.pk console.pk %}">
+                      {% csrf_token %}
+                      <input type="hidden" name="acompanhar" value="{% if console.acompanhar %}0{% else %}1{% endif %}">
+                      <button type="submit" class="link">{% if console.acompanhar %}Deixar de acompanhar{% else %}Acompanhar{% endif %}</button>
+                    </form>
+                  {% endif %}
+                {% endif %}
+              </td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      <p class="nota">Só os consoles acompanhados entram nas coletas e nos relatórios.</p>
+    {% elif chave %}
+      <p class="vazio">Nenhum console ainda.{% if pode_testar_conexao %} Use o botão de testar a conexão para buscar os consoles da conta.{% endif %}</p>
+    {% else %}
+      <p class="vazio">Os consoles aparecem aqui depois que a chave for cadastrada e testada.</p>
+    {% endif %}
+  </section>
+
+  <p><a href="{% url 'clientes:lista' %}">Voltar para clientes</a></p>
+{% endblock %}

@@ -1,7 +1,9 @@
 # Dashboard UniFi — sistema (fase 2)
 
 Aplicação web multi-tenant: cada MSP (organização) tem seus usuários e clientes e nunca enxerga outro MSP.
-Esta é a etapa 1 (fundação): login com MFA, organizações, papéis, cadastro de clientes, isolamento entre MSPs e auditoria.
+Pronto até aqui:
+- Etapa 1 (fundação): login com MFA, organizações, papéis, cadastro de clientes, isolamento entre MSPs e auditoria.
+- Etapa 2 (clientes e conexões): chave da UniFi de cada cliente guardada cifrada, "Testar conexão" e escolha de quais consoles acompanhar.
 
 Todos os comandos abaixo são para o PowerShell do Windows e rodam dentro da pasta `sistema`.
 
@@ -33,6 +35,14 @@ Criar o arquivo `.env` com chave e senhas aleatórias (não aparecem na tela; o 
 ```powershell
 .\.venv\Scripts\python.exe scripts\gerar_env.py
 ```
+
+Se o `.env` já existe (de uma versão anterior), acrescente só as linhas novas, sem mexer nas que já estão lá:
+
+```powershell
+.\.venv\Scripts\python.exe scripts\gerar_env.py --completar
+```
+
+Faça uma cópia do `.env` num lugar seguro fora do computador (um cofre de senhas, por exemplo). Ele guarda a `UNIFI_CHAVE_MESTRA`, que cifra as chaves da UniFi salvas no banco: se ela se perder, essas chaves não abrem mais e precisam ser cadastradas de novo em cada cliente.
 
 Criar o banco `unifi_sistema` e os dois usuários do banco. Abre o `psql`, que pede a senha do `postgres`:
 
@@ -95,7 +105,32 @@ Precisa de um app autenticador no celular (Google Authenticator, Microsoft Authe
 7. Entre como o operador do A: cadastra e edita clientes, mas não vê o menu Usuários.
 8. Erre a senha de um usuário 5 vezes: o login fica bloqueado por 15 minutos, mesmo com a senha certa.
 
-## 6. Como o sistema está organizado
+### Validação da etapa 2 (com a chave real do lab)
+
+Precisa de uma chave Site Manager: em unifi.ui.com, menu API, gere uma chave (ou use a do lab). A chave é colada só na tela do sistema, nunca no chat.
+
+1. Entre como o admin do MSP A e abra um cliente (clique no nome na lista).
+2. Em "Conexão com a UniFi", clique em "Cadastrar chave", cole a chave e salve. A página mostra só os 4 últimos caracteres.
+3. Clique em "Testar conexão". Deve aparecer "Conexão funcionou" e o UDR na tabela de consoles, com "Acompanhar: Sim". Consoles antigos ou desconectados da conta aparecem com "Não".
+4. Clique em "Deixar de acompanhar" no UDR e depois em "Acompanhar" de novo.
+5. Cadastre a mesma chave em outro cliente do MSP A e teste: o UDR aparece com "Não". Clicar em "Acompanhar" mostra em qual cliente ele já é acompanhado.
+6. Entre como o operador do A: testa a conexão e muda o acompanhamento, mas não vê "Trocar chave" nem "Apagar chave". Como leitura: vê tudo, sem nenhum botão.
+7. Entre como o admin do MSP B: nada do MSP A aparece (clientes, chaves, consoles).
+8. Volte ao admin do A, clique em "Trocar chave" e salve uma chave inventada, por exemplo `abcdefghij0123456789`. "Testar conexão" deve mostrar "A UniFi recusou a chave (401)". Depois volte a chave certa.
+9. Clique em "Testar conexão" 6 vezes seguidas: a sexta mostra "Muitos testes seguidos".
+
+## 6. Troca da chave mestra
+
+Para trocar a `UNIFI_CHAVE_MESTRA` (por exemplo, se o `.env` vazou), com o sistema parado:
+
+```powershell
+.\.venv\Scripts\python.exe scripts\gerar_env.py --trocar-chave-mestra
+.\.venv\Scripts\python.exe manage.py recriptografar
+```
+
+Depois apague a linha `UNIFI_CHAVE_MESTRA_ANTERIOR` do `.env` e suba o sistema de novo. Se a chave mestra vazou, troque também as chaves da UniFi dos clientes em unifi.ui.com.
+
+## 7. Como o sistema está organizado
 
 ```
 sistema/
@@ -110,17 +145,24 @@ sistema/
   organizacoes/       organização, vínculo com papel, isolamento (RLS), telas de usuários
   clientes/           cadastro de clientes
   auditoria/          registro de eventos (só de acréscimo)
+  cofre/              criptografia das credenciais e troca da chave mestra
+  unifi/              cliente da api.ui.com (só leitura)
+  conexoes/           chave da UniFi de cada cliente, testar conexão e consoles
   templates/, static/ telas e CSS/HTMX
 ```
 
-## 7. Regras de segurança implementadas
+## 8. Regras de segurança implementadas
 
 - Isolamento entre MSPs em duas travas:
   - Camada única no Django (`organizacoes/isolamento.py`): os modelos de dado de MSP filtram pela organização atual e recusam gravar em outra.
-  - Row-Level Security do PostgreSQL com FORCE em clientes, vínculos e eventos da organização. A organização e o usuário da requisição são definidos com `set_config(..., true)`, com valores passados como parâmetro, e valem só dentro da transação. Sem organização definida, nenhuma linha aparece.
+  - Row-Level Security do PostgreSQL com FORCE em clientes, vínculos, eventos da organização, chaves da UniFi e consoles. A organização e o usuário da requisição são definidos com `set_config(..., true)`, com valores passados como parâmetro, e valem só dentro da transação. Sem organização definida, nenhuma linha aparece.
 - Dois usuários do banco: `unifi_dono` (dono das tabelas, só para migrações e para criar o banco dos testes) e `unifi_app` (usado pelo sistema: não é dono, não é superusuário, sem BYPASSRLS). O superusuário `postgres` só é usado na instalação.
 - A organização da requisição vem só do vínculo do usuário logado. Registro de outra organização responde 404.
 - Login por e-mail e senha (mínimo de 12 caracteres), sem cadastro aberto. MFA por app autenticador obrigatório para admins e para o dono, com códigos de recuperação. Bloqueio após 5 senhas erradas (cache no banco, vale para vários processos). Sessão expira após 2 horas sem uso.
 - O admin do Django não tem login próprio: sempre passa pelo login do sistema, com MFA.
 - Auditoria só de acréscimo: o `unifi_app` só pode incluir e ler eventos. Senhas, códigos de MFA e chaves nunca são registrados.
 - Cookies Secure, HttpOnly e SameSite; CSRF; CSP sem nada embutido; X-Frame-Options DENY. Na publicação, `DJANGO_HTTPS=1` liga o redirecionamento para HTTPS e o HSTS.
+- Chaves da UniFi cifradas no banco (Fernet) com a `UNIFI_CHAVE_MESTRA`, que fica só no ambiente. Depois de salva, a chave nunca volta para a tela: só os 4 últimos caracteres. Páginas de erro escondem qualquer configuração ou campo com CHAVE, SENHA, KEY ou PASS no nome.
+- Chaves e consoles levam a organização e o cliente; o banco recusa ligar uma chave ou console a cliente de outra organização (chave estrangeira composta).
+- Conversa com a UniFi só de leitura (`unifi/api.py`): lista fechada de caminhos, certificado sempre verificado, sem seguir redirecionamento, prazo por chamada e limite de tamanho da resposta. Do `/v1/hosts`, nada de e-mail, localização ou usuários é guardado.
+- "Testar conexão": no máximo 5 por minuto por organização. Só admin cadastra, troca ou apaga chaves; admin e operador testam e escolhem os consoles.

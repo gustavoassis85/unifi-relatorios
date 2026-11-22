@@ -16,6 +16,12 @@ class Acao(models.TextChoices):
     CLIENTE_CRIADO = "cliente_criado", "Cliente criado"
     CLIENTE_ALTERADO = "cliente_alterado", "Cliente alterado"
     CLIENTE_APAGADO = "cliente_apagado", "Cliente apagado"
+    CHAVE_CADASTRADA = "chave_cadastrada", "Chave da UniFi cadastrada"
+    CHAVE_TROCADA = "chave_trocada", "Chave da UniFi trocada"
+    CHAVE_APAGADA = "chave_apagada", "Chave da UniFi apagada"
+    CONEXAO_TESTADA = "conexao_testada", "Conexão com a UniFi testada"
+    CONSOLE_ACOMPANHADO = "console_acompanhado", "Console passou a ser acompanhado"
+    CONSOLE_NAO_ACOMPANHADO = "console_nao_acompanhado", "Console deixou de ser acompanhado"
     ORGANIZACAO_CRIADA = "organizacao_criada", "Organização criada"
     ORGANIZACAO_ALTERADA = "organizacao_alterada", "Organização alterada"
 

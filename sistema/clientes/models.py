@@ -19,6 +19,9 @@ class Cliente(ModeloDaOrganizacao):
             models.UniqueConstraint(
                 "organizacao", Lower("nome"), name="cliente_nome_unico_na_organizacao"
             ),
+            # Alvo das chaves estrangeiras compostas (organização + cliente) das tabelas
+            # que pertencem a um cliente: o banco garante que são da mesma organização.
+            models.UniqueConstraint(fields=["organizacao", "id"], name="cliente_organizacao_id"),
         ]
 
     def __str__(self):

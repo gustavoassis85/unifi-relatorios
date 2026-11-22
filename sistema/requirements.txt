@@ -26,6 +26,13 @@ pycparser==3.12
 django-csp==4.0
 packaging==26.3
 
+# Conversa com a api.ui.com (só leitura), com verificação de certificado
+requests==2.34.2
+urllib3==2.8.0
+idna==3.20
+certifi==2026.11.20
+charset-normalizer==3.5.2
+
 # Testes
 pytest==9.2.0
 pytest-django==4.14.0

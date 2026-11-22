@@ -16,6 +16,7 @@ def desativada(request, *args, **kwargs):
 urlpatterns = [
     path("", inicio, name="inicio"),
     path("clientes/", include("clientes.urls")),
+    path("clientes/", include("conexoes.urls")),
     path("usuarios/", include("organizacoes.urls")),
     # O e-mail é o login e quem o define é o admin da organização: o usuário não
     # troca nem acrescenta e-mails por conta própria.

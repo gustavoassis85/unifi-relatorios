@@ -21,6 +21,21 @@ def lista(request):
     return render(request, "clientes/lista.html", {"clientes": Cliente.objects.all()})
 
 
+@exige(papeis.pode_ver_clientes)
+def detalhe(request, pk):
+    from conexoes.views import chave_do_cliente
+
+    from conexoes.models import Console
+
+    cliente = _cliente_da_organizacao(pk)
+    contexto = {
+        "cliente": cliente,
+        "chave": chave_do_cliente(cliente),
+        "consoles": Console.objects.filter(cliente=cliente),
+    }
+    return render(request, "clientes/detalhe.html", contexto)
+
+
 @exige(papeis.pode_editar_clientes)
 @require_http_methods(["GET", "POST"])
 def novo(request):
@@ -29,7 +44,7 @@ def novo(request):
         cliente = form.save()
         registrar(request, Acao.CLIENTE_CRIADO, cliente_id=cliente.pk, nome=cliente.nome)
         messages.success(request, f"Cliente {cliente.nome} cadastrado.")
-        return redirect("clientes:lista")
+        return redirect("clientes:detalhe", pk=cliente.pk)
     return render(request, "clientes/form.html", {"form": form, "titulo": "Novo cliente"})
 
 
@@ -59,11 +74,16 @@ def editar(request, pk):
 @exige(papeis.pode_editar_clientes)
 @require_http_methods(["GET", "POST"])
 def apagar(request, pk):
+    from conexoes.views import chave_do_cliente
+
     cliente = _cliente_da_organizacao(pk)
+    chave = chave_do_cliente(cliente)
     if request.method == "POST":
         nome, cliente_id = cliente.nome, cliente.pk
-        cliente.delete()
-        registrar(request, Acao.CLIENTE_APAGADO, cliente_id=cliente_id, nome=nome)
+        cliente.delete()  # a chave da UniFi do cliente vai junto
+        registrar(
+            request, Acao.CLIENTE_APAGADO, cliente_id=cliente_id, nome=nome, conexao_unifi=chave is not None
+        )
         messages.success(request, f"Cliente {nome} apagado.")
         return redirect("clientes:lista")
-    return render(request, "clientes/apagar.html", {"cliente": cliente})
+    return render(request, "clientes/apagar.html", {"cliente": cliente, "chave": chave})
