@@ -30,6 +30,31 @@ ADMIN_URL = obrigatorio("DJANGO_ADMIN_URL")
 if not ADMIN_URL.endswith("/") or ADMIN_URL.strip("/") == "admin":
     raise ImproperlyConfigured("DJANGO_ADMIN_URL deve terminar com / e não pode ser admin/.")
 
+# Chave mestra do cofre: cifra as credenciais guardadas no banco (chaves da UniFi).
+# Na troca, a antiga fica em UNIFI_CHAVE_MESTRA_ANTERIOR até rodar manage.py recriptografar.
+UNIFI_CHAVE_MESTRA = obrigatorio("UNIFI_CHAVE_MESTRA")
+UNIFI_CHAVES_MESTRAS_ANTERIORES = lista("UNIFI_CHAVE_MESTRA_ANTERIOR")
+
+
+def _conferir_chaves_mestras():
+    from cryptography.fernet import Fernet
+
+    for nome, valor in [("UNIFI_CHAVE_MESTRA", UNIFI_CHAVE_MESTRA)] + [
+        ("UNIFI_CHAVE_MESTRA_ANTERIOR", v) for v in UNIFI_CHAVES_MESTRAS_ANTERIORES
+    ]:
+        try:
+            Fernet(valor)
+        except (ValueError, TypeError):
+            raise ImproperlyConfigured(
+                f"{nome} não é uma chave válida. Gere uma com: python scripts\\gerar_env.py --completar"
+            ) from None
+
+
+_conferir_chaves_mestras()
+
+# Páginas e relatórios de erro escondem também nomes em português (CHAVE, SENHA).
+DEFAULT_EXCEPTION_REPORTER_FILTER = "cofre.filtro_erros.FiltroDeErros"
+
 INSTALLED_APPS = [
     "django.contrib.admin",
     "django.contrib.auth",
@@ -44,6 +69,7 @@ INSTALLED_APPS = [
     "organizacoes",
     "clientes",
     "auditoria",
+    "cofre",
 ]
 
 MIDDLEWARE = [
