@@ -24,6 +24,8 @@ class Acao(models.TextChoices):
     CONSOLE_NAO_ACOMPANHADO = "console_nao_acompanhado", "Console deixou de ser acompanhado"
     COLETA_PEDIDA = "coleta_pedida", "Coleta pedida"
     MARCA_ALTERADA = "marca_alterada", "Marca alterada"
+    RELATORIO_PEDIDO = "relatorio_pedido", "Relatório pedido"
+    RELATORIO_BAIXADO = "relatorio_baixado", "PDF do relatório baixado"
     ORGANIZACAO_CRIADA = "organizacao_criada", "Organização criada"
     ORGANIZACAO_ALTERADA = "organizacao_alterada", "Organização alterada"
 

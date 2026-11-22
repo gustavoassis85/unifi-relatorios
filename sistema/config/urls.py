@@ -18,6 +18,7 @@ urlpatterns = [
     path("clientes/", include("clientes.urls")),
     path("clientes/", include("conexoes.urls")),
     path("clientes/", include("coletas.urls")),
+    path("clientes/", include("relatorios.urls_cliente")),
     path("usuarios/", include("organizacoes.urls")),
     path("relatorios/", include("relatorios.urls")),
     # O e-mail é o login e quem o define é o admin da organização: o usuário não

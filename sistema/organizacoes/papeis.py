@@ -34,5 +34,9 @@ def pode_editar_marca(papel):
     return papel == Papel.ADMIN
 
 
+def pode_gerar_relatorio(papel):
+    return papel in (Papel.ADMIN, Papel.OPERADOR)
+
+
 def exige_mfa(papel):
     return papel == Papel.ADMIN
