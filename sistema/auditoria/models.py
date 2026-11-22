@@ -19,6 +19,7 @@ class Acao(models.TextChoices):
     CHAVE_CADASTRADA = "chave_cadastrada", "Chave da UniFi cadastrada"
     CHAVE_TROCADA = "chave_trocada", "Chave da UniFi trocada"
     CHAVE_APAGADA = "chave_apagada", "Chave da UniFi apagada"
+    CONEXAO_TESTADA = "conexao_testada", "Conexão com a UniFi testada"
     ORGANIZACAO_CRIADA = "organizacao_criada", "Organização criada"
     ORGANIZACAO_ALTERADA = "organizacao_alterada", "Organização alterada"
 

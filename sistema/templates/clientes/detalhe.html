@@ -13,17 +13,56 @@
         <dt>Chave da API</dt><dd>terminada em <code>{{ chave.final|default:"····" }}</code></dd>
         <dt>Cadastrada em</dt><dd>{{ chave.cadastrada_em|date:"d/m/Y H:i" }}</dd>
         {% if chave.trocada_em %}<dt>Trocada em</dt><dd>{{ chave.trocada_em|date:"d/m/Y H:i" }}</dd>{% endif %}
+        <dt>Último teste</dt>
+        <dd>
+          {% if chave.testada_em %}
+            {{ chave.testada_em|date:"d/m/Y H:i" }} ·
+            <span class="{% if chave.teste_ok %}ok{% else %}falha{% endif %}">{{ chave.teste_resultado }}</span>
+          {% else %}
+            Ainda não testada.
+          {% endif %}
+        </dd>
       </dl>
-      {% if pode_gerenciar_chaves %}
-        <div class="botoes">
+      <div class="botoes">
+        {% if pode_testar_conexao %}
+          <form method="post" action="{% url 'conexoes:testar' cliente.pk %}" hx-disabled-elt="find button">
+            {% csrf_token %}
+            <button type="submit">Testar conexão</button>
+          </form>
+        {% endif %}
+        {% if pode_gerenciar_chaves %}
           <a href="{% url 'conexoes:chave' cliente.pk %}">Trocar chave</a>
           <a href="{% url 'conexoes:chave_apagar' cliente.pk %}">Apagar chave</a>
-        </div>
-      {% endif %}
+        {% endif %}
+      </div>
     {% else %}
       <p class="vazio">Nenhuma chave da UniFi cadastrada para este cliente.
         {% if pode_gerenciar_chaves %}<a href="{% url 'conexoes:chave' cliente.pk %}">Cadastrar chave</a>.
         {% else %}Peça a um admin da organização para cadastrar.{% endif %}</p>
+    {% endif %}
+  </section>
+
+  <section class="bloco">
+    <h2>Consoles</h2>
+    {% if consoles %}
+      <table>
+        <thead><tr><th>Nome</th><th>Modelo</th><th>Situação</th><th>Network</th><th>Acompanhar</th></tr></thead>
+        <tbody>
+          {% for console in consoles %}
+            <tr>
+              <td>{{ console.nome|default:console.host_id }}</td>
+              <td>{{ console.modelo|default:"—" }}</td>
+              <td>{{ console.situacao }}</td>
+              <td>{{ console.versao_network|default:"—" }}</td>
+              <td>{{ console.acompanhar|yesno:"Sim,Não" }}</td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    {% elif chave %}
+      <p class="vazio">Nenhum console ainda.{% if pode_testar_conexao %} Use o botão de testar a conexão para buscar os consoles da conta.{% endif %}</p>
+    {% else %}
+      <p class="vazio">Os consoles aparecem aqui depois que a chave for cadastrada e testada.</p>
     {% endif %}
   </section>
 

@@ -36,4 +36,5 @@ def para_templates(request):
         "pode_editar_clientes": papeis.pode_editar_clientes(papel),
         "pode_gerenciar_usuarios": papeis.pode_gerenciar_usuarios(papel),
         "pode_gerenciar_chaves": papeis.pode_gerenciar_chaves(papel),
+        "pode_testar_conexao": papeis.pode_testar_conexao(papel),
     }

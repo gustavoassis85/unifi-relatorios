@@ -25,8 +25,15 @@ def lista(request):
 def detalhe(request, pk):
     from conexoes.views import chave_do_cliente
 
+    from conexoes.models import Console
+
     cliente = _cliente_da_organizacao(pk)
-    return render(request, "clientes/detalhe.html", {"cliente": cliente, "chave": chave_do_cliente(cliente)})
+    contexto = {
+        "cliente": cliente,
+        "chave": chave_do_cliente(cliente),
+        "consoles": Console.objects.filter(cliente=cliente),
+    }
+    return render(request, "clientes/detalhe.html", contexto)
 
 
 @exige(papeis.pode_editar_clientes)

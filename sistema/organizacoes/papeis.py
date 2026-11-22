@@ -24,5 +24,10 @@ def pode_gerenciar_chaves(papel):
     return papel == Papel.ADMIN
 
 
+def pode_testar_conexao(papel):
+    """Testar a conexão com a UniFi e escolher quais consoles acompanhar."""
+    return papel in (Papel.ADMIN, Papel.OPERADOR)
+
+
 def exige_mfa(papel):
     return papel == Papel.ADMIN

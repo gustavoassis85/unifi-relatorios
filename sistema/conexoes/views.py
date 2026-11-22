@@ -60,3 +60,29 @@ def apagar(request, pk):
         messages.success(request, f"Chave de {cliente.nome} apagada.")
         return redirect("clientes:detalhe", pk=cliente.pk)
     return render(request, "conexoes/chave_apagar.html", {"cliente": cliente, "chave": chave})
+
+
+@exige(papeis.pode_testar_conexao)
+@require_http_methods(["POST"])
+def testar(request, pk):
+    from .servicos import testar_conexao
+
+    cliente = get_object_or_404(Cliente.objects, pk=pk)
+    chave = chave_do_cliente(cliente)
+    if chave is None:
+        messages.error(request, "Cadastre a chave da UniFi antes de testar.")
+        return redirect("clientes:detalhe", pk=cliente.pk)
+
+    resultado = testar_conexao(chave)
+    if resultado.codigo != "limite_sistema":
+        registrar(
+            request,
+            Acao.CONEXAO_TESTADA,
+            cliente_id=cliente.pk,
+            cliente=cliente.nome,
+            resultado=resultado.codigo,
+            consoles=resultado.consoles,
+            conectados=resultado.conectados,
+        )
+    (messages.success if resultado.ok else messages.error)(request, resultado.mensagem)
+    return redirect("clientes:detalhe", pk=cliente.pk)

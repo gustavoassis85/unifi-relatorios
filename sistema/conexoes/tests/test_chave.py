@@ -216,8 +216,8 @@ def test_sem_organizacao_nada_aparece(com_chave_b):
 def test_banco_recusa_chave_em_cliente_de_outra_organizacao(msps):
     inserir = (
         "insert into conexoes_chaveunifi "
-        "(organizacao_id, cliente_id, chave_cifrada, final, cadastrada_em) "
-        "values (%s, %s, 'x', 'x', now())"
+        "(organizacao_id, cliente_id, chave_cifrada, final, cadastrada_em, teste_resultado) "
+        "values (%s, %s, 'x', 'x', now(), '')"
     )
     with contexto(organizacao_id=msps.org_a.pk):
         with pytest.raises(DatabaseError) as erro, transaction.atomic():
