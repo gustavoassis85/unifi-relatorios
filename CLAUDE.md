@@ -5,7 +5,7 @@ SaaS de relatórios para MSPs que usam UniFi. Produto: relatório de saúde da r
 
 Duas fases:
 - Fase 1, MVP do lab (concluída): scripts Python na raiz do projeto que coletam, geram os pontos de atenção e montam o relatório HTML de um ambiente.
-- Fase 2, sistema (em construção, etapas 1 e 2 concluídas): aplicação web multi-tenant em sistema/, que reaproveita os coletores, as regras e o relatório do MVP.
+- Fase 2, sistema (em construção, etapas 1 a 3 concluídas): aplicação web multi-tenant em sistema/, que reaproveita os coletores, as regras e o relatório do MVP.
 
 ## Como trabalhar com o Gustavo
 - Ele não é desenvolvedor. Guiar passo a passo, um passo por vez.
@@ -125,8 +125,9 @@ Fase 1, MVP do lab (concluída):
 Fase 2, sistema (em sistema/):
 1. Fundação (concluída em 21/11/2026): projeto Django, PostgreSQL, login com MFA, organizações, papéis, isolamento com RLS, auditoria e testes de isolamento. Detalhe em planos/etapa-1-fundacao.md; como subir em sistema/README.md.
 2. Clientes e conexões (concluída em 21/11/2026): chave da UniFi por cliente cifrada no cofre (cofre/, UNIFI_CHAVE_MESTRA), cliente da api.ui.com só leitura (unifi/api.py), "Testar conexão" e consoles por cliente com "acompanhar" (conexoes/). IP direto fica para depois da publicação. Detalhe em planos/etapa-2-clientes-conexoes.md.
-3. Coletores rodando por organização, em segundo plano (os módulos de coletor/ passam para o sistema). Só consoles com "acompanhar" ligado; a chave sai de ChaveUniFi.abrir() e as chamadas passam por unifi/api.py. Rever aqui: o "Testar conexão" segura a transação da requisição por até 30 s.  ← próxima
-4. Relatórios sob demanda e PDF automático (Playwright). Entram aqui as pendências do relatório: juntar achados relacionados num incidente (ex.: horas sem dado + perda alta no mesmo dia); registros antigos (network-server) vão para uma seção de higiene da conta, não para o relatório do cliente.
+3. Coletores (concluída em 21/11/2026): fila no PostgreSQL e `manage.py trabalhador` (tarefas/), coletas portadas do MVP em coletas/coletores/ (só consoles acompanhados; no minuto 30 de cada hora; o MVP roda no minuto 3), dados por organização/cliente/console sob RLS, retenção (90 dias amostras e tráfego por dispositivo, 13 meses agregados), "Coletar agora" e `manage.py resumo_cliente`. Detalhe em planos/etapa-3-coletores.md.
+4. Relatórios sob demanda e PDF automático (Playwright).  ← próxima
+   O relatório lê as tabelas de coletas/models.py (não o SQLite do MVP) e traduz nomes com coletas.catalogo.Nomes ((categoria << 16) | aplicativo). Quando o relatório estiver no sistema, desligar a coleta do MVP no Agendador de Tarefas ("UniFi Relatorios - Coleta"). Pendente da etapa 2: o "Testar conexão" segura a transação da requisição por até 30 s. Entram aqui as pendências do relatório: juntar achados relacionados num incidente (ex.: horas sem dado + perda alta no mesmo dia); registros antigos (network-server) vão para uma seção de higiene da conta, não para o relatório do cliente.
 5. Agendamentos, SMTP e o fallback para PDF.
 6. Publicação num servidor, com backup e monitoramento, e revisão de segurança por um dev antes do primeiro MSP pagante.
 
@@ -148,7 +149,7 @@ unifi-relatorios/
   .gitignore
   requirements.txt
   planos/           (detalhe de cada etapa do sistema)
-  sistema/          (fase 2: projeto Django, criado na etapa 1)
+  sistema/          (fase 2: projeto Django; apps contas, organizacoes, clientes, auditoria, cofre, unifi, conexoes, tarefas, coletas)
 
   MVP (fase 1):
   coletar.py        (roda todas as coletas; uma falha não derruba as outras)
