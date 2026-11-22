@@ -66,6 +66,7 @@ Connector (API Network de cada console, via nuvem):
 - Dados por cliente e consumo: não existem na API oficial (nem na v11.0.97). Vêm das APIs internas do Network, que a chave da nuvem acessa pelo connector (validado em 15/11/2026):
   - GET {connector}/network/v2/api/site/{site}/clients/active → nome, type (WIRELESS/WIRED), oui (fabricante), model_name (tipo), fingerprint.os_name (código do SO), essid, signal, wifi_experience_score, wifi_tx_retries_percentage, sw_port, wired_rate_mbps, tx_bytes/rx_bytes desde a conexão.
   - GET {connector}/network/v2/api/site/{site}/traffic?start=ms&end=ms&includeUnidentified=true → total_usage_by_app (application, category, bytes_received = download, bytes_transmitted = upload, client_count) e client_usage_by_app (não usamos: LGPD). application 65535 / category 255 = não identificado.
+    O console só guarda o tráfego por aplicativo do dia corrente (desde a meia-noite): dias passados voltam vazios e "últimas 24h" = hoje (conferido em 21/11/2026). O sistema busca o dia de hoje em toda coleta de hora em hora.
   - GET {connector}/network/v2/api/fingerprint_devices/0 → os_name_ids, vendor_ids, family_ids, dev_type_ids (tradução).
   - POST {connector}/network/api/s/{site}/stat/report/daily.site e daily.user (consulta de leitura) → wan-rx_bytes = download e wan-tx_bytes = upload do site por dia; por cliente, tx_bytes = download e rx_bytes = upload (validado com a tela do UniFi).
   - POST {connector}/network/api/s/{site}/stat/report/hourly.site → consumo por hora (horário de pico). Se falhar, o coletor segue sem ele.

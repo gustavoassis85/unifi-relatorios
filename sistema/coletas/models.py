@@ -231,3 +231,138 @@ class PortaEstado(DoConsole):
         constraints = [
             models.UniqueConstraint(fields=["console", "device_id", "coletado_em", "idx"], name="porta_estado_unica")
         ]
+
+
+# Clientes conectados, consumo e aplicativos (APIs internas do Network) ------------------
+
+class ClienteAmostra(DoConsole):
+    """Cada dispositivo conectado, a cada coleta (v2 clients/active). Guardado por 90 dias.
+    Não guarda tráfego por aplicativo de cada dispositivo (LGPD)."""
+
+    site = models.CharField(max_length=100)                      # nome interno (ex.: default)
+    mac = models.CharField(max_length=50)
+    nome = models.CharField(max_length=150, blank=True)
+    tipo = models.CharField(max_length=20, blank=True)           # WIRELESS ou WIRED
+    fabricante = models.CharField(max_length=150, blank=True)    # pelo prefixo do MAC
+    modelo = models.CharField(max_length=150, blank=True)        # identificação do UniFi
+    so_id = models.IntegerField(null=True, blank=True)           # traduzido pelo catálogo
+    rede = models.CharField(max_length=150, blank=True)
+    ssid = models.CharField(max_length=150, blank=True)
+    sinal_dbm = models.IntegerField(null=True, blank=True)
+    experiencia = models.IntegerField(null=True, blank=True)     # nota Wi-Fi do UniFi (0 a 100)
+    retransmissao_pct = models.FloatField(null=True, blank=True)
+    porta = models.IntegerField(null=True, blank=True)
+    velocidade_mbps = models.IntegerField(null=True, blank=True)
+    conectado_seg = models.BigIntegerField(null=True, blank=True)
+
+    class Meta:
+        verbose_name = "amostra de dispositivo conectado"
+        verbose_name_plural = "amostras de dispositivos conectados"
+        constraints = [models.UniqueConstraint(fields=["console", "mac", "coletado_em"], name="cliente_amostra_unica")]
+        indexes = [models.Index(fields=["cliente", "coletado_em"])]
+
+
+class InternetDia(DoConsole):
+    """Consumo da internet do site por dia (relatório daily.site do console)."""
+
+    site = models.CharField(max_length=100)
+    dia = models.DateField()                                      # no horário de Brasília
+    download_bytes = models.BigIntegerField(null=True, blank=True)
+    upload_bytes = models.BigIntegerField(null=True, blank=True)
+    clientes = models.IntegerField(null=True, blank=True)
+
+    class Meta:
+        verbose_name = "internet por dia"
+        verbose_name_plural = "internet por dia"
+        constraints = [models.UniqueConstraint(fields=["console", "site", "dia"], name="internet_dia_unica")]
+
+
+class InternetHora(DoConsole):
+    """Consumo da internet do site por hora (hourly.site), para o horário de pico."""
+
+    site = models.CharField(max_length=100)
+    hora = models.DateTimeField()
+    download_bytes = models.BigIntegerField(null=True, blank=True)
+    upload_bytes = models.BigIntegerField(null=True, blank=True)
+    clientes = models.IntegerField(null=True, blank=True)
+
+    class Meta:
+        verbose_name = "internet por hora"
+        verbose_name_plural = "internet por hora"
+        constraints = [models.UniqueConstraint(fields=["console", "site", "hora"], name="internet_hora_unica")]
+
+
+class ClienteDia(DoConsole):
+    """Tráfego de cada dispositivo por dia (daily.user): rede local + internet, sem aplicativos."""
+
+    site = models.CharField(max_length=100)
+    mac = models.CharField(max_length=50)
+    dia = models.DateField()
+    download_bytes = models.BigIntegerField(null=True, blank=True)
+    upload_bytes = models.BigIntegerField(null=True, blank=True)
+
+    class Meta:
+        verbose_name = "dispositivo por dia"
+        verbose_name_plural = "dispositivos por dia"
+        constraints = [models.UniqueConstraint(fields=["console", "site", "mac", "dia"], name="cliente_dia_unico")]
+
+
+class AplicativoDia(DoConsole):
+    """Tráfego por aplicativo, só no total do site (sem detalhe por pessoa, LGPD)."""
+
+    site = models.CharField(max_length=100)
+    dia = models.DateField()
+    categoria_id = models.IntegerField()
+    aplicativo_id = models.IntegerField()
+    download_bytes = models.BigIntegerField(null=True, blank=True)
+    upload_bytes = models.BigIntegerField(null=True, blank=True)
+    dispositivos = models.IntegerField(null=True, blank=True)
+
+    class Meta:
+        verbose_name = "aplicativo por dia"
+        verbose_name_plural = "aplicativos por dia"
+        constraints = [models.UniqueConstraint(
+            fields=["console", "site", "dia", "categoria_id", "aplicativo_id"], name="aplicativo_dia_unico")]
+
+
+class NaoIdentificadoDia(DoConsole):
+    """Tráfego não identificado pelo DPI, somado por família de dispositivo (sem guardar quem é quem)."""
+
+    site = models.CharField(max_length=100)
+    dia = models.DateField()
+    familia_id = models.IntegerField()                            # -1 = família desconhecida
+    bytes = models.BigIntegerField(null=True, blank=True)
+    dispositivos = models.IntegerField(null=True, blank=True)
+
+    class Meta:
+        verbose_name = "não identificado por dia"
+        verbose_name_plural = "não identificado por dia"
+        constraints = [models.UniqueConstraint(
+            fields=["console", "site", "dia", "familia_id"], name="naoident_dia_unico")]
+
+
+class ControleColeta(DoConsole):
+    """Quando cada coleta "de tempos em tempos" rodou pela última vez em cada site."""
+
+    nome = models.CharField(max_length=50)                       # ex.: consumo
+    site = models.CharField(max_length=100)
+
+    class Meta:
+        verbose_name = "controle de coleta"
+        verbose_name_plural = "controles de coleta"
+        constraints = [models.UniqueConstraint(fields=["console", "nome", "site"], name="controle_coleta_unico")]
+
+
+class Catalogo(models.Model):
+    """Tabela de tradução da UniFi (aplicativos, categorias, sistemas...). Igual para todos:
+    fica na plataforma, sem organização e sem RLS."""
+
+    tipo = models.CharField(max_length=30)   # dpi_categoria, dpi_aplicativo, so, fabricante, familia, tipo_dispositivo
+    id_unifi = models.IntegerField()
+    nome = models.CharField(max_length=200, blank=True)
+    atualizado_em = models.DateTimeField(default=timezone.now)
+
+    class Meta:
+        verbose_name = "catálogo"
+        verbose_name_plural = "catálogos"
+        constraints = [models.UniqueConstraint(fields=["tipo", "id_unifi"], name="catalogo_unico")]
