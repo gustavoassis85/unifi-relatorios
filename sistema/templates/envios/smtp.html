@@ -1,0 +1,25 @@
+{% extends "base.html" %}
+{% block head_title %}E-mail (SMTP){% endblock %}
+{% block content %}
+  <h1>Servidor de e-mail (SMTP)</h1>
+  <p class="nota">Por este servidor saem os relatórios agendados. Sem ele, os agendamentos só geram o relatório e deixam no histórico do cliente.</p>
+  {% if config %}
+    <div class="bloco">
+      <dl class="dados">
+        <dt>Senha guardada</dt><dd>{% if config.senha_cifrada %}{% if config.final %}termina em {{ config.final }}{% else %}sim{% endif %}{% else %}nenhuma{% endif %}</dd>
+      </dl>
+      {% include "envios/_teste_smtp.html" %}
+      <form method="post" action="{% url 'envios:testar' %}">
+        {% csrf_token %}
+        <div class="botoes"><button type="submit">Enviar teste para {{ user.email }}</button></div>
+      </form>
+    </div>
+  {% endif %}
+  <form method="post" novalidate>
+    {% csrf_token %}
+    {% include "_campos.html" %}
+    <div class="botoes">
+      <button type="submit">Salvar servidor de e-mail</button>
+    </div>
+  </form>
+{% endblock %}

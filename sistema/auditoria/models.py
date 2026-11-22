@@ -26,6 +26,8 @@ class Acao(models.TextChoices):
     MARCA_ALTERADA = "marca_alterada", "Marca alterada"
     RELATORIO_PEDIDO = "relatorio_pedido", "Relatório pedido"
     RELATORIO_BAIXADO = "relatorio_baixado", "PDF do relatório baixado"
+    SMTP_ALTERADO = "smtp_alterado", "Servidor de e-mail alterado"
+    SMTP_TESTADO = "smtp_testado", "Teste do servidor de e-mail pedido"
     ORGANIZACAO_CRIADA = "organizacao_criada", "Organização criada"
     ORGANIZACAO_ALTERADA = "organizacao_alterada", "Organização alterada"
 

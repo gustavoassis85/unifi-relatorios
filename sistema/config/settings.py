@@ -75,6 +75,7 @@ INSTALLED_APPS = [
     "tarefas",
     "coletas",
     "relatorios",
+    "envios",
 ]
 
 MIDDLEWARE = [
@@ -187,10 +188,13 @@ SESSION_COOKIE_AGE = 2 * 60 * 60
 SESSION_SAVE_EVERY_REQUEST = True
 SESSION_EXPIRE_AT_BROWSER_CLOSE = True
 
-# E-mail: o SMTP chega numa etapa futura. Por enquanto, mensagens vão para o terminal.
+# E-mail do próprio sistema (allauth): por enquanto vai para o terminal.
 EMAIL_BACKEND = os.environ.get(
     "DJANGO_EMAIL_BACKEND", "django.core.mail.backends.console.EmailBackend"
 )
+# Relatórios por e-mail: saem pelo SMTP de cada organização (envios/), só para a Internet.
+ENVIOS_BACKEND = "envios.rede.BackendSoInternet"
+ENVIOS_PERMITIR_REDE_INTERNA = False
 
 LANGUAGE_CODE = "pt-br"
 TIME_ZONE = "America/Sao_Paulo"

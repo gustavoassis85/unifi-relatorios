@@ -38,5 +38,6 @@ def para_templates(request):
         "pode_gerenciar_chaves": papeis.pode_gerenciar_chaves(papel),
         "pode_testar_conexao": papeis.pode_testar_conexao(papel),
         "pode_editar_marca": papeis.pode_editar_marca(papel),
+        "pode_configurar_smtp": papeis.pode_configurar_smtp(papel),
         "pode_gerar_relatorio": papeis.pode_gerar_relatorio(papel),
     }
