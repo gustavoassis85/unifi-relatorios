@@ -6,4 +6,4 @@ class ColetasConfig(AppConfig):
     verbose_name = "Coletas"
 
     def ready(self):
-        from . import tarefas  # noqa: F401  (registra a tarefa de coleta e a periódica)
+        from . import coletores, tarefas  # noqa: F401  (registra a tarefa, a periódica e as partes)

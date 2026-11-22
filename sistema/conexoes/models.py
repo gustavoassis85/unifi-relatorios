@@ -88,6 +88,8 @@ class Console(ModeloDaOrganizacao):
         ordering = ["-na_conta", "-conectado", "nome"]
         constraints = [
             models.UniqueConstraint(fields=["cliente", "host_id"], name="console_unico_no_cliente"),
+            # Alvo das chaves estrangeiras compostas (cliente + console) dos dados coletados.
+            models.UniqueConstraint(fields=["cliente", "id"], name="console_cliente_id"),
             # O mesmo console não pode ser acompanhado por dois clientes da mesma organização.
             models.UniqueConstraint(
                 fields=["organizacao", "host_id"],
