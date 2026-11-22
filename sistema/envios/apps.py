@@ -8,7 +8,7 @@ class EnviosConfig(AppConfig):
     def ready(self):
         from cofre.registro import registrar
 
-        from . import tarefas  # noqa: F401  (registra as tarefas de e-mail)
+        from . import disparo, tarefas  # noqa: F401  (registra a periódica e as tarefas de e-mail)
         from .models import ConfigSmtp
 
         registrar(ConfigSmtp)  # entra na troca da chave mestra

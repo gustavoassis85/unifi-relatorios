@@ -38,6 +38,11 @@ class SituacaoRelatorio(models.TextChoices):
     FALHOU = "falhou", "Falhou"
 
 
+class Origem(models.TextChoices):
+    MANUAL = "manual", "Manual"
+    AGENDADO = "agendado", "Agendado"
+
+
 class Relatorio(DoCliente):
     """Um relatório gerado: período, quem pediu, o HTML, o PDF e a higiene da conta (só para o MSP)."""
 
@@ -49,6 +54,10 @@ class Relatorio(DoCliente):
     pedido_por = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True,
                                    related_name="+", verbose_name="pedido por")
     pedido_em = models.DateTimeField("pedido em", default=timezone.now)
+    origem = models.CharField("origem", max_length=10, choices=Origem.choices, default=Origem.MANUAL)
+    # Fica nulo se o agendamento for excluído; a origem continua dizendo que foi agendado.
+    agendamento = models.ForeignKey("envios.Agendamento", on_delete=models.SET_NULL, null=True, blank=True,
+                                    related_name="+", verbose_name="agendamento")
     pronto_em = models.DateTimeField("pronto em", null=True, blank=True)
     html = models.TextField("HTML", blank=True)
     pdf = models.BinaryField("PDF", null=True, blank=True)

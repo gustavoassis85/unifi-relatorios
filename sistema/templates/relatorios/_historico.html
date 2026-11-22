@@ -6,7 +6,7 @@
         {% for r in relatorios %}
           <tr>
             <td>{{ r.rotulo }}</td>
-            <td>{% if r.pedido_por %}{{ r.pedido_por.nome|default:r.pedido_por.email }}{% else %}—{% endif %}</td>
+            <td>{% if r.origem == "agendado" %}Agendamento{% elif r.pedido_por %}{{ r.pedido_por.nome|default:r.pedido_por.email }}{% else %}—{% endif %}</td>
             <td>{{ r.pedido_em|date:"d/m/Y H:i" }}</td>
             <td>{% if r.situacao == "pronto" %}<span class="ok">Pronto</span>{% elif r.situacao == "falhou" %}<span class="falha" title="{{ r.erro }}">Falhou</span>{% else %}Gerando…{% endif %}</td>
             <td class="acoes">
