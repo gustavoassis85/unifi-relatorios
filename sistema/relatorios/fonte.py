@@ -10,7 +10,7 @@ from collections import defaultdict
 from django.db.models import F, Max, Min, Sum
 
 from coletas.models import (
-    AplicativoDia, ClienteAmostra, ClienteDia, ConsoleEstado, EquipamentoAmostra, InternetDia, InternetHora,
+    AplicativoDia, Catalogo, ClienteAmostra, ClientesAmostra, ClienteDia, ConsoleEstado, EquipamentoAmostra, InternetDia, InternetHora,
     NaoIdentificadoDia, PortaEstado, RadioAmostra, RadioConfig, WanHora,
 )
 
@@ -30,6 +30,16 @@ class Fonte:
         return consulta.filter(**{f"{coluna}__gte": inicio, f"{coluna}__lte": fim}).order_by(coluna)
 
     # Link -------------------------------------------------------------------------
+
+    def wan_horas(self, host_id, inicio, fim):
+        return list(self._periodo(self._q(WanHora).filter(host_id=host_id), "horario", inicio, fim).values())
+
+    def contagem_clientes(self, host_id, inicio, fim):
+        return list(self._periodo(self._q(ClientesAmostra).filter(host_id=host_id), "coletado_em", inicio, fim).values())
+
+    @staticmethod
+    def catalogo(tipo):
+        return dict(Catalogo.objects.filter(tipo=tipo).values_list("id_unifi", "nome"))
 
     def wan_por_site(self, inicio, fim):
         sites = defaultdict(list)
@@ -51,8 +61,11 @@ class Fonte:
 
     # Equipamentos -----------------------------------------------------------------
 
-    def equipamento_amostras(self, inicio, fim):
-        return list(self._periodo(self._q(EquipamentoAmostra), "coletado_em", inicio, fim).values())
+    def equipamento_amostras(self, inicio, fim, host_id=None):
+        consulta = self._q(EquipamentoAmostra)
+        if host_id is not None:
+            consulta = consulta.filter(host_id=host_id)
+        return list(self._periodo(consulta, "coletado_em", inicio, fim).values())
 
     def ultimos_equipamentos(self):
         linhas = self._q(EquipamentoAmostra).order_by("device_id", "-coletado_em").distinct("device_id").values()
@@ -75,8 +88,11 @@ class Fonte:
     def amostras_wifi(self, inicio, fim):
         return list(self._periodo(self._q(ClienteAmostra).filter(tipo="WIRELESS"), "coletado_em", inicio, fim).values())
 
-    def amostras_dispositivos(self, inicio, fim):
-        return list(self._periodo(self._q(ClienteAmostra), "coletado_em", inicio, fim).values())
+    def amostras_dispositivos(self, inicio, fim, host_id=None):
+        consulta = self._q(ClienteAmostra)
+        if host_id is not None:
+            consulta = consulta.filter(host_id=host_id)
+        return list(self._periodo(consulta, "coletado_em", inicio, fim).values())
 
     def nome_dispositivo(self, host_id, mac):
         linha = (self._q(ClienteAmostra).filter(host_id=host_id, mac=mac).exclude(nome="")
@@ -103,7 +119,7 @@ class Fonte:
 
     def aplicativos(self, host_id, dia_ini, dia_fim):
         return list(self._q(AplicativoDia).filter(host_id=host_id, dia__range=(dia_ini, dia_fim))
-                    .values("categoria_id", "aplicativo_id")
+                    .values(cat=F("categoria_id"), app=F("aplicativo_id"))
                     .annotate(d=Sum("download_bytes"), u=Sum("upload_bytes"), disp=Max("dispositivos")).order_by())
 
     def nao_identificado(self, host_id, dia_ini, dia_fim):
