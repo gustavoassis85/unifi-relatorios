@@ -66,3 +66,24 @@ def cliente_da_mesma_organizacao(tabela):
         ],
         reverse_sql=[f"alter table {tabela} drop constraint if exists {restricao}"],
     )
+
+
+def console_do_mesmo_cliente(tabela):
+    """Dado coletado de um console: chave estrangeira composta (cliente, console) para
+    conexoes_console. Junto com cliente_da_mesma_organizacao, o banco garante que
+    organização, cliente e console batem."""
+    restricao = f"{tabela}_console_mesmo_cliente"
+    return migrations.RunSQL(
+        sql=[
+            f"alter table {tabela} add constraint {restricao} "
+            f"foreign key (cliente_id, console_id) "
+            f"references conexoes_console (cliente_id, id) "
+            f"deferrable initially deferred"
+        ],
+        reverse_sql=[f"alter table {tabela} drop constraint if exists {restricao}"],
+    )
+
+
+def travas_de_dado_coletado(tabela):
+    """RLS + organização/cliente + cliente/console, para cada tabela de dado coletado."""
+    return [rls_por_organizacao(tabela), cliente_da_mesma_organizacao(tabela), console_do_mesmo_cliente(tabela)]

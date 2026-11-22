@@ -5,7 +5,7 @@ SaaS de relatórios para MSPs que usam UniFi. Produto: relatório de saúde da r
 
 Duas fases:
 - Fase 1, MVP do lab (concluída): scripts Python na raiz do projeto que coletam, geram os pontos de atenção e montam o relatório HTML de um ambiente.
-- Fase 2, sistema (em construção, etapas 1 e 2 concluídas): aplicação web multi-tenant em sistema/, que reaproveita os coletores, as regras e o relatório do MVP.
+- Fase 2, sistema (em construção, etapas 1 a 3 concluídas): aplicação web multi-tenant em sistema/, que reaproveita os coletores, as regras e o relatório do MVP.
 
 ## Como trabalhar com o Gustavo
 - Ele não é desenvolvedor. Guiar passo a passo, um passo por vez.
@@ -66,6 +66,7 @@ Connector (API Network de cada console, via nuvem):
 - Dados por cliente e consumo: não existem na API oficial (nem na v11.0.97). Vêm das APIs internas do Network, que a chave da nuvem acessa pelo connector (validado em 15/11/2026):
   - GET {connector}/network/v2/api/site/{site}/clients/active → nome, type (WIRELESS/WIRED), oui (fabricante), model_name (tipo), fingerprint.os_name (código do SO), essid, signal, wifi_experience_score, wifi_tx_retries_percentage, sw_port, wired_rate_mbps, tx_bytes/rx_bytes desde a conexão.
   - GET {connector}/network/v2/api/site/{site}/traffic?start=ms&end=ms&includeUnidentified=true → total_usage_by_app (application, category, bytes_received = download, bytes_transmitted = upload, client_count) e client_usage_by_app (não usamos: LGPD). application 65535 / category 255 = não identificado.
+    O console só guarda o tráfego por aplicativo do dia corrente (desde a meia-noite): dias passados voltam vazios e "últimas 24h" = hoje (conferido em 21/11/2026). O sistema busca o dia de hoje em toda coleta de hora em hora.
   - GET {connector}/network/v2/api/fingerprint_devices/0 → os_name_ids, vendor_ids, family_ids, dev_type_ids (tradução).
   - POST {connector}/network/api/s/{site}/stat/report/daily.site e daily.user (consulta de leitura) → wan-rx_bytes = download e wan-tx_bytes = upload do site por dia; por cliente, tx_bytes = download e rx_bytes = upload (validado com a tela do UniFi).
   - POST {connector}/network/api/s/{site}/stat/report/hourly.site → consumo por hora (horário de pico). Se falhar, o coletor segue sem ele.
@@ -124,8 +125,9 @@ Fase 1, MVP do lab (concluída):
 Fase 2, sistema (em sistema/):
 1. Fundação (concluída em 21/11/2026): projeto Django, PostgreSQL, login com MFA, organizações, papéis, isolamento com RLS, auditoria e testes de isolamento. Detalhe em planos/etapa-1-fundacao.md; como subir em sistema/README.md.
 2. Clientes e conexões (concluída em 21/11/2026): chave da UniFi por cliente cifrada no cofre (cofre/, UNIFI_CHAVE_MESTRA), cliente da api.ui.com só leitura (unifi/api.py), "Testar conexão" e consoles por cliente com "acompanhar" (conexoes/). IP direto fica para depois da publicação. Detalhe em planos/etapa-2-clientes-conexoes.md.
-3. Coletores rodando por organização, em segundo plano (os módulos de coletor/ passam para o sistema). Só consoles com "acompanhar" ligado; a chave sai de ChaveUniFi.abrir() e as chamadas passam por unifi/api.py. Rever aqui: o "Testar conexão" segura a transação da requisição por até 30 s.  ← próxima
-4. Relatórios sob demanda e PDF automático (Playwright). Entram aqui as pendências do relatório: juntar achados relacionados num incidente (ex.: horas sem dado + perda alta no mesmo dia); registros antigos (network-server) vão para uma seção de higiene da conta, não para o relatório do cliente.
+3. Coletores (concluída em 21/11/2026): fila no PostgreSQL e `manage.py trabalhador` (tarefas/), coletas portadas do MVP em coletas/coletores/ (só consoles acompanhados; no minuto 30 de cada hora; o MVP roda no minuto 3), dados por organização/cliente/console sob RLS, retenção (90 dias amostras e tráfego por dispositivo, 13 meses agregados), "Coletar agora" e `manage.py resumo_cliente`. Detalhe em planos/etapa-3-coletores.md.
+4. Relatórios sob demanda e PDF automático (Playwright).  ← próxima
+   O relatório lê as tabelas de coletas/models.py (não o SQLite do MVP) e traduz nomes com coletas.catalogo.Nomes ((categoria << 16) | aplicativo). Quando o relatório estiver no sistema, desligar a coleta do MVP no Agendador de Tarefas ("UniFi Relatorios - Coleta"). Pendente da etapa 2: o "Testar conexão" segura a transação da requisição por até 30 s. Entram aqui as pendências do relatório: juntar achados relacionados num incidente (ex.: horas sem dado + perda alta no mesmo dia); registros antigos (network-server) vão para uma seção de higiene da conta, não para o relatório do cliente.
 5. Agendamentos, SMTP e o fallback para PDF.
 6. Publicação num servidor, com backup e monitoramento, e revisão de segurança por um dev antes do primeiro MSP pagante.
 
@@ -147,7 +149,7 @@ unifi-relatorios/
   .gitignore
   requirements.txt
   planos/           (detalhe de cada etapa do sistema)
-  sistema/          (fase 2: projeto Django, criado na etapa 1)
+  sistema/          (fase 2: projeto Django; apps contas, organizacoes, clientes, auditoria, cofre, unifi, conexoes, tarefas, coletas)
 
   MVP (fase 1):
   coletar.py        (roda todas as coletas; uma falha não derruba as outras)

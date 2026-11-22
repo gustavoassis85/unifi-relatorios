@@ -22,6 +22,7 @@ class Acao(models.TextChoices):
     CONEXAO_TESTADA = "conexao_testada", "Conexão com a UniFi testada"
     CONSOLE_ACOMPANHADO = "console_acompanhado", "Console passou a ser acompanhado"
     CONSOLE_NAO_ACOMPANHADO = "console_nao_acompanhado", "Console deixou de ser acompanhado"
+    COLETA_PEDIDA = "coleta_pedida", "Coleta pedida"
     ORGANIZACAO_CRIADA = "organizacao_criada", "Organização criada"
     ORGANIZACAO_ALTERADA = "organizacao_alterada", "Organização alterada"
 

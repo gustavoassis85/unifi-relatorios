@@ -4,6 +4,7 @@ Aplicação web multi-tenant: cada MSP (organização) tem seus usuários e clie
 Pronto até aqui:
 - Etapa 1 (fundação): login com MFA, organizações, papéis, cadastro de clientes, isolamento entre MSPs e auditoria.
 - Etapa 2 (clientes e conexões): chave da UniFi de cada cliente guardada cifrada, "Testar conexão" e escolha de quais consoles acompanhar.
+- Etapa 3 (coletores): o trabalhador coleta sozinho, de hora em hora, os consoles acompanhados de todos os clientes.
 
 Todos os comandos abaixo são para o PowerShell do Windows e rodam dentro da pasta `sistema`.
 
@@ -84,6 +85,23 @@ O admin do Django (onde o dono cria organizações) fica no endereço da linha `
 Select-String -Path .env -Pattern '^DJANGO_ADMIN_URL='
 ```
 
+### O trabalhador (coletas em segundo plano)
+
+As coletas rodam num segundo processo, o trabalhador. Abra outro PowerShell (ou outro terminal no VS Code), entre na pasta `sistema` e rode:
+
+```powershell
+.\.venv\Scripts\python.exe manage.py trabalhador
+```
+
+Deixe as duas janelas abertas: uma com o site, outra com o trabalhador. Ele coleta todos os clientes no minuto 30 de cada hora, roda os pedidos de "Coletar agora" e, às 3h15 e às 4h, limpa tarefas antigas e dados que passaram do prazo. Se ficar desligado, a coleta roda uma vez assim que ele voltar. Para parar: `Ctrl+C` (ele termina a coleta em andamento antes de sair).
+
+Para ver os números coletados de um cliente (o número é o que aparece no endereço da página dele, por exemplo `/clientes/3/`):
+
+```powershell
+.\.venv\Scripts\python.exe manage.py resumo_cliente 3
+.\.venv\Scripts\python.exe manage.py resumo_cliente 3 --dias 30
+```
+
 ## 4. Rodar os testes
 
 ```powershell
@@ -119,6 +137,15 @@ Precisa de uma chave Site Manager: em unifi.ui.com, menu API, gere uma chave (ou
 8. Volte ao admin do A, clique em "Trocar chave" e salve uma chave inventada, por exemplo `abcdefghij0123456789`. "Testar conexão" deve mostrar "A UniFi recusou a chave (401)". Depois volte a chave certa.
 9. Clique em "Testar conexão" 6 vezes seguidas: a sexta mostra "Muitos testes seguidos".
 
+### Validação da etapa 3 (coletas)
+
+1. Suba o site e, em outra janela, o trabalhador (seção 3).
+2. Na página do cliente com a chave do lab, clique em "Coletar agora". Em até 1 minuto, recarregue a página: o bloco "Coletas" mostra a coleta com cada parte em OK, e a tabela de consoles mostra a hora da última coleta.
+3. Deixe os dois rodando até passar do minuto 30 de alguma hora: aparece uma nova coleta, marcada como automática.
+4. Rode `manage.py resumo_cliente <número do cliente>` e compare com o MVP (`python resumo_wan.py` e `python resumo_equipamentos.py` na raiz do projeto): horas de WAN por dia, perda, equipamentos e dispositivos devem bater. Diferenças esperadas: dias em que o computador estava desligado aparecem no sistema (ele busca 30 dias na primeira vez) e o consumo de aplicativos do sistema é mais completo (ele busca os aplicativos de hora em hora).
+5. Na janela do trabalhador, aperte `Ctrl+C`: ele mostra "Parando" e depois "Trabalhador parado".
+6. Entre como admin do outro MSP: nenhuma coleta do cliente do lab aparece.
+
 ## 6. Troca da chave mestra
 
 Para trocar a `UNIFI_CHAVE_MESTRA` (por exemplo, se o `.env` vazou), com o sistema parado:
@@ -148,6 +175,8 @@ sistema/
   cofre/              criptografia das credenciais e troca da chave mestra
   unifi/              cliente da api.ui.com (só leitura)
   conexoes/           chave da UniFi de cada cliente, testar conexão e consoles
+  tarefas/            fila de tarefas no PostgreSQL, tarefas periódicas e o comando trabalhador
+  coletas/            coletas portadas do MVP, dados coletados, retenção e resumo_cliente
   templates/, static/ telas e CSS/HTMX
 ```
 
@@ -166,3 +195,7 @@ sistema/
 - Chaves e consoles levam a organização e o cliente; o banco recusa ligar uma chave ou console a cliente de outra organização (chave estrangeira composta).
 - Conversa com a UniFi só de leitura (`unifi/api.py`): lista fechada de caminhos, certificado sempre verificado, sem seguir redirecionamento, prazo por chamada e limite de tamanho da resposta. Do `/v1/hosts`, nada de e-mail, localização ou usuários é guardado.
 - "Testar conexão": no máximo 5 por minuto por organização. Só admin cadastra, troca ou apaga chaves; admin e operador testam e escolhem os consoles.
+- Trabalhador: conecta como o usuário da aplicação (o mesmo do site) e roda cada tarefa no contexto da organização dela; a RLS vale como no site. A fila não guarda chave nem dado coletado. Erros inesperados ficam só com o tipo do erro na tela; o detalhe vai para o log do servidor.
+- Dados coletados: toda tabela tem organização, cliente e console, sob RLS, e o banco garante que os três batem. Do `/v1/hosts`, nada de e-mail, localização ou usuários; aplicativos só no total da rede.
+- Retenção: amostras de equipamentos e dispositivos e tráfego por dispositivo por 90 dias; agregados do site por 13 meses.
+- Catálogos (nomes de aplicativos e sistemas da UniFi) ficam numa tabela da plataforma, compartilhada por todas as organizações. Para a revisão de segurança antes do primeiro MSP pagante: um console adulterado poderia trocar esses nomes para todos (o texto é sempre escapado na tela, então não vira código).
