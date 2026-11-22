@@ -159,7 +159,7 @@ Precisa de uma chave Site Manager: em unifi.ui.com, menu API, gere uma chave (ou
 2. Como admin do MSP do lab, abra o menu Marca: preencha empresa e contato, escolha o tema e envie um logo PNG ou JPG. Tente enviar um arquivo que não é imagem (um .txt renomeado para .png): deve ser recusado.
 3. Na página do cliente do lab, em Relatórios, escolha "Últimos 7 dias" e clique em "Gerar relatório". A linha aparece como "Gerando…" e vira "Pronto" sozinha em poucos segundos.
 4. Clique em "Ver": o relatório abre numa aba nova, com a marca. Clique em "Baixar PDF" e abra o arquivo.
-5. Compare com o relatório do MVP do mesmo período (`python gerar_relatorio.py --dias 7` na raiz do projeto, arquivo em `dadoselatorios\`): mesmas seções, mesmos números de link, equipamentos e dispositivos. Diferenças esperadas: o do sistema tem uma seção por console do cliente, não traz os registros antigos (eles ficam no bloco "Higiene da conta", só na tela do MSP) e pode ter mais dados onde o MVP ficou com buracos (computador desligado) e no consumo de aplicativos.
+5. Compare com o relatório do MVP do mesmo período (`python gerar_relatorio.py --dias 7` na raiz do projeto, arquivo em `dados\relatorios\`): mesmas seções, mesmos números de link, equipamentos e dispositivos. Diferenças esperadas: o do sistema tem uma seção por console do cliente, não traz os registros antigos (eles ficam no bloco "Higiene da conta", só na tela do MSP) e pode ter mais dados onde o MVP ficou com buracos (computador desligado) e no consumo de aplicativos.
 6. Entre como o usuário de leitura: vê e baixa os relatórios, mas não tem o botão "Gerar relatório" nem o menu Marca.
 7. Entre como admin do outro MSP: nenhum relatório do cliente do lab aparece.
 
